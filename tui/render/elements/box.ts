@@ -44,13 +44,13 @@ export const BoxLayout: LayoutHandler<BoxInstance> = (instance) => {
 };
 
 export const BoxElement: ElementHandler<BoxInstance> = (instance, context): Position[] => {
-	const x = context.parentX + instance.yogaNode.getComputedLeft();
-	const y = context.parentY + instance.yogaNode.getComputedTop();
+	const x = context.parentX + Math.round(instance.yogaNode.getComputedLeft());
+	const y = context.parentY + Math.round(instance.yogaNode.getComputedTop());
 	const positions: Position[] = [];
 
 	if (instance.props.border) {
-		const w = instance.yogaNode.getComputedWidth();
-		const h = instance.yogaNode.getComputedHeight();
+		const w = Math.round(instance.yogaNode.getComputedWidth());
+		const h = Math.round(instance.yogaNode.getComputedHeight());
 		positions.push(
 			...drawBox(
 				x,

@@ -38,11 +38,10 @@ export function clearPendingCursor() {
 }
 
 export const TextInputElement: ElementHandler<TextInputInstance> = (instance, context): Position[] => {
-	const x = context.parentX + instance.yogaNode.getComputedLeft();
-	const y = context.parentY + instance.yogaNode.getComputedTop();
-	const widthNum = instance.yogaNode.getComputedWidth();
-	const height = instance.yogaNode.getComputedHeight();
-	const width = Math.ceil(widthNum);
+	const x = context.parentX + Math.round(instance.yogaNode.getComputedLeft());
+	const y = context.parentY + Math.round(instance.yogaNode.getComputedTop());
+	const width = Math.round(instance.yogaNode.getComputedWidth());
+	const height = Math.round(instance.yogaNode.getComputedHeight());
 
 	const value = instance.props.value || "";
 	const placeholder = instance.props.placeholder || "";
@@ -101,17 +100,16 @@ export const TextInputElement: ElementHandler<TextInputInstance> = (instance, co
 		}
 
 		positions.push({
-			x: Math.round(x),
-			y: Math.round(y) + lineIdx,
+			x,
+			y: y + lineIdx,
 			text: formattedText,
 		});
 	}
 
-	// Set cursor position if focused and within visible area
 	if (instance.props.focused && cursorLine < height) {
 		pendingCursor = {
-			x: Math.round(x) + cursorCol,
-			y: Math.round(y) + cursorLine,
+			x: x + cursorCol,
+			y: y + cursorLine,
 			visible: true,
 			style: instance.props.cursorStyle,
 		};

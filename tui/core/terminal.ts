@@ -154,13 +154,27 @@ export class Terminal {
 	}
 
 	render(positions: Array<{ x: number; y: number; text: string }>) {
-		this.currentBuffer = this.createEmptyBuffer();
+		this.clearBuffer(this.currentBuffer);
 
 		for (const { x, y, text } of positions) {
 			this.writeToBuffer(Math.round(x), Math.round(y), text);
 		}
 
 		this.flush();
+	}
+
+	private clearBuffer(buffer: Cell[][]) {
+		for (let y = 0; y < this.height; y++) {
+			const row = buffer[y];
+			if (!row) continue;
+			for (let x = 0; x < this.width; x++) {
+				const cell = row[x];
+				if (cell) {
+					cell.char = " ";
+					cell.style = "";
+				}
+			}
+		}
 	}
 
 	private flush() {
@@ -191,7 +205,7 @@ export class Terminal {
 			this.cursorY = -1;
 		}
 
-		this.previousBuffer = this.currentBuffer.map((row) => row.map((cell) => ({ ...cell })));
+		[this.previousBuffer, this.currentBuffer] = [this.currentBuffer, this.previousBuffer];
 		this.isFirstRender = false;
 	}
 

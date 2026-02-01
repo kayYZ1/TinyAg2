@@ -20,8 +20,8 @@ export class Renderer {
 
 	renderInstance(instance: Instance, parentX = 0, parentY = 0): Position[] {
 		const context: RenderContext = {
-			parentX,
-			parentY,
+			parentX: Math.round(parentX),
+			parentY: Math.round(parentY),
 			renderInstance: this.renderInstance.bind(this),
 		};
 
