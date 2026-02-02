@@ -144,13 +144,14 @@ export function run(createVNode: () => VNode) {
 
 	inputManager.start();
 
-	const cleanup = inputManager.onKey((event: { key: string; ctrl: boolean }) => {
+	const cleanup = inputManager.onKeyGlobal((event) => {
 		if (event.ctrl && event.key === "c") {
 			cleanup();
 			inputManager.stop();
 			unmount();
 			process.exit();
 		}
+		return false;
 	});
 
 	return {

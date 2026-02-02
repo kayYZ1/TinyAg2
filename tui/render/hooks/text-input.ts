@@ -129,13 +129,12 @@ export function useTextInput(options: UseTextInputOptions) {
 		const state: TextState = { value: options.value, cursorPosition: options.cursorPosition };
 
 		const cleanup = inputManager.onKey((event: KeyEvent) => {
-			if (options.focused === false) return;
+			if (options.focused === false) return false;
 
 			if (options.mode?.value === "NORMAL") {
-				handleNormalMode(event, state, options);
-			} else {
-				handleInsertMode(event, state, options);
+				return handleNormalMode(event, state, options);
 			}
+			return handleInsertMode(event, state, options);
 		});
 
 		setCleanup(key, cleanup);

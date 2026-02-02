@@ -8,9 +8,10 @@ export interface KeyEvent {
 	shift: boolean;
 }
 
-type KeyHandler = (event: KeyEvent) => void;
+export type KeyHandler = (event: KeyEvent) => boolean | void;
 
 class InputManager {
+	private globalHandlers: Set<KeyHandler> = new Set();
 	private handlers: Set<KeyHandler> = new Set();
 	private isRawMode = false;
 
@@ -39,8 +40,11 @@ class InputManager {
 	private handleData = (data: string) => {
 		for (const char of data) {
 			const event = this.parseKey(char);
+			for (const handler of this.globalHandlers) {
+				if (handler(event) === true) return;
+			}
 			for (const handler of this.handlers) {
-				handler(event);
+				if (handler(event) === true) return;
 			}
 		}
 	};
@@ -73,6 +77,11 @@ class InputManager {
 		}
 
 		return { key: char, ctrl: false, meta: false, shift: false };
+	}
+
+	onKeyGlobal(handler: KeyHandler): () => void {
+		this.globalHandlers.add(handler);
+		return () => this.globalHandlers.delete(handler);
 	}
 
 	onKey(handler: KeyHandler): () => void {
