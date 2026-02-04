@@ -41,9 +41,9 @@ That's all for the demo!`;
 function MarkdownDemo() {
 	return (
 		<Box flex flexDirection="column" padding={1} gap={1}>
-				<Box padding={1} flex>
-					<Markdown flex>{DEMO_MARKDOWN}</Markdown>
-				</Box>
+			<Box padding={1} flex>
+				<Markdown flex>{DEMO_MARKDOWN}</Markdown>
+			</Box>
 			<Box>
 				<Text color="gray" italic>
 					Press Ctrl+C to exit
