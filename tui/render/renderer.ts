@@ -3,7 +3,7 @@ import { effect } from "@preact/signals-core";
 import Y from "yoga-layout";
 import { inputManager } from "../core/input.ts";
 import { Terminal } from "../core/terminal.ts";
-import { getElement } from "./elements/index.ts";
+import { ElementType, getElement } from "./elements/index.ts";
 import { clearPendingCursor, getPendingCursor } from "./elements/text-input.ts";
 import { cleanupEffects, nextComponent, resetHooks } from "./hooks/signals.ts";
 import type { VNode } from "./jsx-runtime.ts";
@@ -20,8 +20,8 @@ export class Renderer {
 
 	renderInstance(instance: Instance, parentX = 0, parentY = 0): Position[] {
 		const context: RenderContext = {
-			parentX,
-			parentY,
+			parentX: Math.round(parentX),
+			parentY: Math.round(parentY),
 			renderInstance: this.renderInstance.bind(this),
 		};
 
@@ -56,9 +56,11 @@ export class Renderer {
 		element.layout(instance);
 
 		if (element.hasChildren) {
-			const children = Array.isArray(vnode.props.children)
+			const rawChildren = Array.isArray(vnode.props.children)
 				? vnode.props.children
 				: [vnode.props.children].filter(Boolean);
+
+			const children = rawChildren.flat(Infinity);
 
 			for (const child of children) {
 				if (typeof child === "string" || typeof child === "number") {
@@ -99,6 +101,7 @@ export class Renderer {
 		const cursor = getPendingCursor();
 		if (cursor?.visible) {
 			this.terminal.setCursorPosition(cursor.x, cursor.y);
+			this.terminal.setCursorStyle(cursor.style ?? "bar");
 			this.terminal.showCursor();
 		} else {
 			this.terminal.hideCursor();
@@ -122,7 +125,7 @@ export class Renderer {
 			this.rootInstance = null;
 		}
 		cleanupEffects();
-		this.terminal.clear();
+		this.terminal.dispose();
 	}
 }
 
@@ -141,13 +144,14 @@ export function run(createVNode: () => VNode) {
 
 	inputManager.start();
 
-	const cleanup = inputManager.onKey((event: { key: string; ctrl: boolean }) => {
+	const cleanup = inputManager.onKeyGlobal((event) => {
 		if (event.ctrl && event.key === "c") {
 			cleanup();
 			inputManager.stop();
 			unmount();
 			process.exit();
 		}
+		return false;
 	});
 
 	return {

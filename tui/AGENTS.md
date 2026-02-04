@@ -14,10 +14,10 @@ tui/
 │       ├── draw-box.ts   # Box/border rendering with styles
 │       ├── format-text.ts# Text styling (bold, italic, colors)
 │       └── wrap-text.ts  # Text wrapping utilities
-├── preact/               # Rendering layer
+├── render/               # JSX rendering layer
 │   ├── renderer.ts       # Custom renderer with Yoga layout
 │   ├── components.tsx    # Box, Text, TextInput components
-│   ├── jsx-runtime.ts    # Custom JSX runtime (no Preact dependency)
+│   ├── jsx-runtime.ts    # Custom JSX runtime
 │   ├── hooks/            # React-like hooks
 │   │   ├── signals.ts    # useSignal, useSignalEffect
 │   │   ├── text-input.ts # useTextInput hook
@@ -54,7 +54,7 @@ tui/
 - Tracks cursor state to avoid redundant escape sequences
 - Methods: `render(positions)`, `clear()`, `showCursor()`, `hideCursor()`
 
-#### `Renderer` (preact/renderer.ts)
+#### `Renderer` (render/renderer.ts)
 
 - Bridges VNodes to terminal output
 - Creates Yoga layout tree from component tree
@@ -90,9 +90,9 @@ Text styling via `<Text>` props:
 
 ### New Component Property
 
-1. Add prop to type in `preact/types/index.ts`
+1. Add prop to type in `render/types/index.ts`
 2. Handle in `Renderer.applyBoxLayout()` or `createInstanceTree()`
-3. Handle in element handler (`elements/box.ts`, `elements/text.ts`, etc.)
+3. Handle in element handler (`render/elements/box.ts`, `render/elements/text.ts`, etc.)
 
 ### New Primitive
 
@@ -102,10 +102,10 @@ Text styling via `<Text>` props:
 
 ### New Element Type
 
-1. Add type to `Instance` union in `types/index.ts`
-2. Create element handler in `preact/elements/`
-3. Register in `preact/elements/index.ts`
-4. Add to JSX IntrinsicElements in `jsx-runtime.ts`
+1. Add type to `Instance` union in `render/types/index.ts`
+2. Create element handler in `render/elements/`
+3. Register in `render/elements/index.ts`
+4. Add to JSX IntrinsicElements in `render/jsx-runtime.ts`
 
 ## Code Patterns
 

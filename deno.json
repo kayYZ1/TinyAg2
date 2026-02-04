@@ -16,13 +16,13 @@
 		"@/core/": "./core/",
 		"@/agent/": "./agent/",
 		"@/tui/": "./tui/",
-		"@/tui/preact/jsx-runtime": "./tui/preact/jsx-runtime.ts",
-		"@/tui/preact/jsx-dev-runtime": "./tui/preact/jsx-dev-runtime.ts",
+		"@/tui/render/jsx-runtime": "./tui/render/jsx-runtime.ts",
+		"@/tui/render/jsx-dev-runtime": "./tui/render/jsx-dev-runtime.ts",
 		"@std/assert": "jsr:@std/assert@^1"
 	},
 	"compilerOptions": {
 		"jsx": "react-jsx",
-		"jsxImportSource": "@/tui/preact"
+		"jsxImportSource": "@/tui/render"
 	},
 	"fmt": {
 		"useTabs": true,

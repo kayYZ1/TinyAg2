@@ -8,9 +8,10 @@ export interface KeyEvent {
 	shift: boolean;
 }
 
-type KeyHandler = (event: KeyEvent) => void;
+export type KeyHandler = (event: KeyEvent) => boolean | void;
 
 class InputManager {
+	private globalHandlers: Set<KeyHandler> = new Set();
 	private handlers: Set<KeyHandler> = new Set();
 	private isRawMode = false;
 
@@ -37,16 +38,70 @@ class InputManager {
 	}
 
 	private handleData = (data: string) => {
-		for (const char of data) {
-			const event = this.parseKey(char);
+		const sequences = this.splitSequences(data);
+		for (const seq of sequences) {
+			const event = this.parseKey(seq);
+			for (const handler of this.globalHandlers) {
+				if (handler(event) === true) return;
+			}
 			for (const handler of this.handlers) {
-				handler(event);
+				if (handler(event) === true) return;
 			}
 		}
 	};
 
-	private parseKey(char: string): KeyEvent {
-		const code = char.charCodeAt(0);
+	splitSequences(data: string): string[] {
+		const sequences: string[] = [];
+		let i = 0;
+		while (i < data.length) {
+			if (data[i] === "\x1b" && data[i + 1] === "[") {
+				let end = i + 2;
+				while (end < data.length && data[end] >= "0" && data[end] <= "9") {
+					end++;
+				}
+				if (data[end] === ";") {
+					end++;
+					while (end < data.length && data[end] >= "0" && data[end] <= "9") {
+						end++;
+					}
+				}
+				if (end < data.length) {
+					end++;
+				}
+				sequences.push(data.slice(i, end));
+				i = end;
+			} else {
+				sequences.push(data[i]);
+				i++;
+			}
+		}
+		return sequences;
+	}
+
+	parseKey(seq: string): KeyEvent {
+		if (seq.startsWith("\x1b[")) {
+			const body = seq.slice(2);
+			switch (body) {
+				case "A":
+					return { key: "up", ctrl: false, meta: false, shift: false };
+				case "B":
+					return { key: "down", ctrl: false, meta: false, shift: false };
+				case "C":
+					return { key: "right", ctrl: false, meta: false, shift: false };
+				case "D":
+					return { key: "left", ctrl: false, meta: false, shift: false };
+				case "H":
+				case "1~":
+					return { key: "home", ctrl: false, meta: false, shift: false };
+				case "F":
+				case "4~":
+					return { key: "end", ctrl: false, meta: false, shift: false };
+				case "3~":
+					return { key: "delete", ctrl: false, meta: false, shift: false };
+			}
+		}
+
+		const code = seq.charCodeAt(0);
 
 		if (code === 3) {
 			return { key: "c", ctrl: true, meta: false, shift: false };
@@ -72,7 +127,12 @@ class InputManager {
 			};
 		}
 
-		return { key: char, ctrl: false, meta: false, shift: false };
+		return { key: seq, ctrl: false, meta: false, shift: false };
+	}
+
+	onKeyGlobal(handler: KeyHandler): () => void {
+		this.globalHandlers.add(handler);
+		return () => this.globalHandlers.delete(handler);
 	}
 
 	onKey(handler: KeyHandler): () => void {

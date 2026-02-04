@@ -7,7 +7,7 @@ import {
 	moveCursor,
 	setCursor,
 	type TextState,
-} from "../preact/hooks/text-utils.ts";
+} from "../render/hooks/text-utils.ts";
 
 function createState(value = "", cursor = 0): TextState {
 	return {

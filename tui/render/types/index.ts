@@ -1,4 +1,21 @@
-import type Y from "yoga-layout";
+import type { Node as YogaNode } from "yoga-layout";
+
+export type CursorStyle = "block" | "bar";
+
+/** Primitive children that render as text */
+export type PrimitiveChild = string | number;
+
+/** What gets stored in VNode after JSX compilation */
+export type VNodeChild = { type: unknown; props: Record<string, unknown> };
+
+/** Valid child types for components */
+export type Child = VNodeChild | VNodeChild[] | PrimitiveChild | null | undefined | false;
+
+/** Children prop type - what JSX accepts */
+export type Children = Child | Child[];
+
+/** Normalized child type stored in instances (after renderer processing) */
+export type InstanceChild = Instance | PrimitiveChild;
 
 export interface Cell {
 	char: string;
@@ -21,7 +38,7 @@ export type ElementHandler<T extends Instance = Instance> = (instance: T, contex
 
 export interface BaseProps {
 	/** Child elements */
-	children?: any;
+	children?: Children;
 }
 
 export interface BoxProps extends BaseProps {
@@ -91,6 +108,8 @@ export interface TextInputProps extends BaseProps {
 	color?: string;
 	/** Placeholder text color */
 	placeholderColor?: string;
+	/** Cursor style (block for normal mode, bar for insert mode) */
+	cursorStyle?: CursorStyle;
 }
 
 export interface SpinnerProps extends BaseProps {
@@ -102,33 +121,51 @@ export interface SpinnerProps extends BaseProps {
 	frame?: number;
 }
 
+export interface MarkdownProps extends BaseProps {
+	/** Width constraint for text wrapping (inherits from parent Box if not set) */
+	width?: number;
+	/** Height constraint (inherits from parent Box if not set) */
+	height?: number;
+	/** Flex grow factor */
+	flex?: number | boolean;
+}
+
+/**
+ * Element registry - single source of truth for all element types.
+ * Extend via module augmentation to add custom elements.
+ */
+export interface ElementRegistry {
+	box: { props: BoxProps; instance: BaseInstance<"box", BoxProps> };
+	text: { props: TextProps; instance: BaseInstance<"text", TextProps> };
+	textInput: { props: TextInputProps; instance: BaseInstance<"textInput", TextInputProps> };
+	spinner: { props: SpinnerProps; instance: BaseInstance<"spinner", SpinnerProps> };
+}
+
 /** Base instance structure - all elements extend this */
 export interface BaseInstance<T extends string = string, P extends BaseProps = BaseProps> {
 	type: T;
 	props: P;
 	children: Instance[];
-	yogaNode: ReturnType<typeof Y.Node.create>;
+	yogaNode: YogaNode;
 }
 
-/** Known element instances for type inference */
-export type BoxInstance = BaseInstance<"box", BoxProps>;
-export type TextInstance = BaseInstance<"text", TextProps>;
-export type TextInputInstance = BaseInstance<"textInput", TextInputProps>;
-export type SpinnerInstance = BaseInstance<"spinner", SpinnerProps>;
+/** All valid element type strings */
+export type ElementTypeName = keyof ElementRegistry;
 
-/** Union of known instances - extensible via module augmentation */
-export type Instance = BoxInstance | TextInstance | TextInputInstance | SpinnerInstance;
+/** Union of all known instances - derived from registry */
+export type Instance = ElementRegistry[keyof ElementRegistry]["instance"];
 
 /** Type helper to extract instance by type name */
-export type InstanceOfType<T extends Instance["type"]> = Extract<Instance, { type: T }>;
+export type InstanceOfType<T extends ElementTypeName> = ElementRegistry[T]["instance"];
 
-/** Props map for JSX type inference */
-export interface ElementPropsMap {
-	box: BoxProps;
-	text: TextProps;
-	textInput: TextInputProps;
-	spinner: SpinnerProps;
-}
+/** Props map for JSX type inference - derived from registry */
+export type ElementPropsMap = { [K in ElementTypeName]: ElementRegistry[K]["props"] };
+
+/** Convenience type aliases for specific instances */
+export type BoxInstance = InstanceOfType<"box">;
+export type TextInstance = InstanceOfType<"text">;
+export type TextInputInstance = InstanceOfType<"textInput">;
+export type SpinnerInstance = InstanceOfType<"spinner">;
 
 /** Element type constants */
 export const ElementType = {
@@ -136,4 +173,4 @@ export const ElementType = {
 	TEXT: "text",
 	TEXT_INPUT: "textInput",
 	SPINNER: "spinner",
-} as const;
+} as const satisfies Record<string, ElementTypeName>;

@@ -1,5 +1,5 @@
 import { assertEquals, assertExists } from "@std/assert";
-import { Fragment, jsx, jsxs } from "../preact/jsx-runtime.ts";
+import { Fragment, jsx, jsxs } from "../render/jsx-runtime.ts";
 
 Deno.test("jsx - creates VNode with string type", () => {
 	const node = jsx("box", { width: 10 });

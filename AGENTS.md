@@ -43,7 +43,7 @@ Use path aliases for cross-package imports:
 ```typescript
 import { Anthropic } from "@/api/providers/anthropic.ts";
 import { Agent } from "@/core/agent.ts";
-import { Box, Text } from "@/tui/preact/components.tsx";
+import { Box, Text } from "@/tui/render/components.tsx";
 ```
 
 ## Code Style Guidelines

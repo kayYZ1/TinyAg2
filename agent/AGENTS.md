@@ -26,7 +26,7 @@ The agent ties together all packages:
 ```typescript
 import { Anthropic } from "@/api/providers/anthropic.ts";
 import { Agent, createContext } from "@/core/agent.ts";
-import { Box, run, Text } from "@/tui/preact/index.ts";
+import { Box, run, Text } from "@/tui/render/index.ts";
 ```
 
 ### UI Components

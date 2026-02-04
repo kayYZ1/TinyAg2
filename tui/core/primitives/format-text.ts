@@ -1,10 +1,18 @@
-import type { Instance } from "@/tui/preact/types/index.ts";
+import type { Instance } from "@/tui/render/types/index.ts";
 import { toAnsi } from "./color.ts";
+
+function childrenToString(children: unknown): string {
+	if (children == null || children === false) return "";
+	if (typeof children === "string") return children;
+	if (typeof children === "number") return String(children);
+	if (Array.isArray(children)) return children.map(childrenToString).join("");
+	return "";
+}
 
 export const formatText = (instance: Instance): string => {
 	if (instance.type !== "text") return "";
 
-	let text = instance.props.children || "";
+	let text = childrenToString(instance.props.children);
 
 	if (typeof instance.props.color === "string") {
 		const ansi = toAnsi(instance.props.color);

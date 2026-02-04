@@ -1,7 +1,19 @@
 import type { Signal } from "@preact/signals-core";
+import type { CursorStyle } from "../types/index.ts";
 import { inputManager, type KeyEvent } from "../../core/input.ts";
 import { getHookKey, hasCleanup, setCleanup } from "./signals.ts";
-import { deleteBackward, deleteForward, insertChar, moveCursor, setCursor, type TextState } from "./text-utils.ts";
+import {
+	deleteBackward,
+	deleteForward,
+	deleteToEnd,
+	deleteToStart,
+	deleteWordBackward,
+	insertChar,
+	moveCursor,
+	setCursor,
+	type TextState,
+	toggleCaseAt,
+} from "./text-utils.ts";
 
 export type VimMode = "NORMAL" | "INSERT";
 
@@ -37,6 +49,50 @@ function handleInsertMode(event: KeyEvent, state: TextState, options: UseTextInp
 
 	if (event.key === "delete" || (event.ctrl && event.key === "d")) {
 		const newValue = deleteForward(state);
+		if (newValue !== null) options.onChange?.(newValue);
+		return true;
+	}
+
+	if (event.key === "tab") {
+		const newValue = insertChar(state, "\t");
+		options.onChange?.(newValue);
+		return true;
+	}
+
+	if (event.key === "left") {
+		moveCursor(state, -1);
+		return true;
+	}
+
+	if (event.key === "right") {
+		moveCursor(state, 1);
+		return true;
+	}
+
+	if (event.key === "home" || (event.ctrl && event.key === "a")) {
+		setCursor(state, 0);
+		return true;
+	}
+
+	if (event.key === "end" || (event.ctrl && event.key === "e")) {
+		setCursor(state, state.value.value.length);
+		return true;
+	}
+
+	if (event.ctrl && event.key === "w") {
+		const newValue = deleteWordBackward(state);
+		if (newValue !== null) options.onChange?.(newValue);
+		return true;
+	}
+
+	if (event.ctrl && event.key === "u") {
+		const newValue = deleteToStart(state);
+		if (newValue !== null) options.onChange?.(newValue);
+		return true;
+	}
+
+	if (event.ctrl && event.key === "k") {
+		const newValue = deleteToEnd(state);
 		if (newValue !== null) options.onChange?.(newValue);
 		return true;
 	}
@@ -116,6 +172,34 @@ function handleNormalMode(event: KeyEvent, state: TextState, options: UseTextInp
 			}
 			return true;
 		}
+		case "e": {
+			const rest = value.slice(cursor);
+			const match = rest.match(/^.?\s*\S*/);
+			if (match?.[0] && match[0].length > 1) {
+				setCursor(state, Math.min(cursor + match[0].length - 1, value.length - 1));
+			}
+			return true;
+		}
+		case "~": {
+			const newValue = toggleCaseAt(state);
+			if (newValue !== null) options.onChange?.(newValue);
+			return true;
+		}
+		case "D": {
+			const newValue = deleteToEnd(state);
+			if (newValue !== null) {
+				options.onChange?.(newValue);
+				if (cursor > 0) moveCursor(state, -1);
+			}
+			return true;
+		}
+		case "C": {
+			const newValue = deleteToEnd(state);
+			if (newValue !== null) options.onChange?.(newValue);
+			mode.value = "INSERT";
+			options.onModeChange?.("INSERT");
+			return true;
+		}
 		default:
 			return false;
 	}
@@ -128,21 +212,23 @@ export function useTextInput(options: UseTextInputOptions) {
 		const state: TextState = { value: options.value, cursorPosition: options.cursorPosition };
 
 		const cleanup = inputManager.onKey((event: KeyEvent) => {
-			if (options.focused === false) return;
+			if (options.focused === false) return false;
 
 			if (options.mode?.value === "NORMAL") {
-				handleNormalMode(event, state, options);
-			} else {
-				handleInsertMode(event, state, options);
+				return handleNormalMode(event, state, options);
 			}
+			return handleInsertMode(event, state, options);
 		});
 
 		setCleanup(key, cleanup);
 	}
 
+	const cursorStyle: CursorStyle = options.mode?.value === "NORMAL" ? "block" : "bar";
+
 	return {
 		value: options.value,
 		cursorPosition: options.cursorPosition,
 		mode: options.mode,
+		cursorStyle,
 	};
 }

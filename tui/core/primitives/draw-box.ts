@@ -1,4 +1,4 @@
-import type { Position } from "@/tui/preact/types/index.ts";
+import type { Position } from "@/tui/render/types/index.ts";
 import { toAnsi } from "./color.ts";
 
 export type BorderStyle = "single" | "double" | "round" | "bold" | "dash" | "block";

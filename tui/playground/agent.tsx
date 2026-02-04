@@ -1,7 +1,7 @@
-import { run } from "@/tui/preact/index.ts";
-import { Box, Spinner, Text, TextInput } from "@/tui/preact/components.tsx";
-import { useSignal } from "@/tui/preact/hooks/signals.ts";
-import { useTextInput, type VimMode } from "@/tui/preact/hooks/text-input.ts";
+import { run } from "@/tui/render/index.ts";
+import { Box, Spinner, Text, TextInput } from "@/tui/render/components.tsx";
+import { useSignal } from "@/tui/render/hooks/signals.ts";
+import { useTextInput, type VimMode } from "@/tui/render/hooks/text-input.ts";
 
 interface Message {
 	role: "user" | "agent";
@@ -31,7 +31,7 @@ function Agent() {
 		}, 1500);
 	};
 
-	useTextInput({
+	const { cursorStyle } = useTextInput({
 		value: input,
 		cursorPosition: cursor,
 		mode,
@@ -39,7 +39,7 @@ function Agent() {
 		onSubmit: handleSubmit,
 	});
 
-	const visibleMessages = messages.value.slice(-8);
+	const visibleMessages = messages.value;
 
 	return (
 		<Box flex flexDirection="column" padding={1} gap={1}>
@@ -68,6 +68,7 @@ function Agent() {
 				<TextInput
 					value={input.value}
 					cursorPosition={cursor.value}
+					cursorStyle={cursorStyle}
 					placeholder="Type a message..."
 					placeholderColor="gray"
 					focused
