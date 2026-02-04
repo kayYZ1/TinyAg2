@@ -121,6 +121,15 @@ export interface SpinnerProps extends BaseProps {
 	frame?: number;
 }
 
+export interface MarkdownProps extends BaseProps {
+	/** Width constraint for text wrapping (inherits from parent Box if not set) */
+	width?: number;
+	/** Height constraint (inherits from parent Box if not set) */
+	height?: number;
+	/** Flex grow factor */
+	flex?: number | boolean;
+}
+
 /**
  * Element registry - single source of truth for all element types.
  * Extend via module augmentation to add custom elements.
