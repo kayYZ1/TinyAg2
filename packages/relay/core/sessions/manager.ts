@@ -244,6 +244,8 @@ export class SessionManager {
 				await Deno.writeTextFile(this.path, JSON.stringify(this.session.header) + "\n");
 				this.needsFlush = false;
 				this.headerDirty = false;
+			} else if (this.headerDirty) {
+				await this.flushHeader();
 			}
 			await Deno.writeTextFile(this.path, JSON.stringify(full) + "\n", { append: true });
 		}
