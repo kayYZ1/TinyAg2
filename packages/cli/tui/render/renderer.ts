@@ -448,10 +448,11 @@ export function render(createVNode: () => VNode, terminal: Terminal) {
 	};
 }
 
-export function run(createVNode: (quit: () => void) => VNode) {
+export function run(createVNode: (quit: () => void) => VNode, onBeforeQuit?: () => void | Promise<void>) {
 	const terminal = new Terminal();
 
-	const quit = () => {
+	const quit = async () => {
+		if (onBeforeQuit) await onBeforeQuit();
 		cleanupKey();
 		inputManager.stop();
 		unmount();

@@ -337,8 +337,10 @@ function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: S
 		onSelect: (item) => {
 			if (isLoading.value) return;
 			session.value.flush();
+			currentSession = null;
 			SessionManager.open(item.id).then((sm) => {
 				session.value = sm;
+				currentSession = sm;
 				uiMessages.value = entriesToUIMessages(sm.getEntries());
 				tokenCount.value = sm.getTokens();
 				totalCost.value = sm.getCost();
@@ -376,11 +378,14 @@ function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: S
 		onSelect: (item) => {
 			if (item.id === "new-chat") {
 				session.value.flush();
+				currentSession = null;
 				uiMessages.value = [];
 				tokenCount.value = 0;
 				totalCost.value = 0;
 				sessionId.value++;
-				session.value = SessionManager.create(Deno.cwd());
+				const newSm = SessionManager.create(Deno.cwd());
+				session.value = newSm;
+				currentSession = newSm;
 			} else if (item.id === "threads") {
 				SessionManager.listSummaries(Deno.cwd()).then((summaries) => {
 					threadItems.value = summaries.map((s) => {
@@ -396,6 +401,8 @@ function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: S
 					threadsPalette.openPalette();
 				});
 			} else if (item.id === "quit") {
+				session.value.flush();
+				currentSession = null;
 				onQuit();
 			}
 		},
@@ -480,8 +487,22 @@ function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: S
 }
 
 // ---------------------------------------------------------------------------
+// Quit handler — flush the current session before exiting
+// ---------------------------------------------------------------------------
+
+let currentSession: SessionManager | null = null;
+
+async function beforeQuit() {
+	if (currentSession) {
+		await currentSession.flush();
+		currentSession = null;
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Entry
 // ---------------------------------------------------------------------------
 
 const initialSession = SessionManager.create(Deno.cwd());
-run((quit) => <App onQuit={quit} initialSession={initialSession} />);
+currentSession = initialSession;
+run((quit) => <App onQuit={quit} initialSession={initialSession} />, beforeQuit);
