@@ -9,7 +9,7 @@ Terminal-based coding agent with custom TUI framework.
 │   ├── relay/              # Core agent library (@vvtxn/relay)
 │   │   ├── api/            # LLM provider types and CompletionsProvider
 │   │   └── core/           # Agent loop, runner, tools, sessions, context, display
-│   └── cli/           # CLI + TUI frontend (@vvtxn/cli)
+│   └── cli/               # CLI + TUI frontend (@vvtxn/cli)
 │       ├── agent/          # App entry point, config, components, hooks
 │       └── tui/            # Terminal UI framework (JSX runtime, Yoga layout)
 ├── scripts/                # Build and version bump scripts
