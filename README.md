@@ -2,9 +2,9 @@
 
 A terminal-based coding agent with a custom TUI framework, built with Deno and TypeScript.
 
-Relay is a monorepo containing a terminal UI framework powered by a custom JSX runtime and Yoga flexbox layout, an
-OpenAI-compatible LLM API layer with streaming support, and an agentic loop with built-in tools — all wired together
-into an interactive coding assistant that runs entirely in your terminal.
+Relay is a monorepo (Deno workspace) containing a terminal UI framework powered by a custom JSX runtime and Yoga flexbox
+layout, an OpenAI-compatible LLM API layer with streaming support, and an agentic loop with built-in tools — all wired
+together into an interactive coding assistant that runs entirely in your terminal.
 
 ## Features
 
@@ -14,7 +14,7 @@ into an interactive coding assistant that runs entirely in your terminal.
   models, etc.)
 - **Streaming agent loop** — Async generator that yields events for real-time UI updates as the LLM thinks and uses
   tools
-- **Built-in tools** — Bash, file read/write/edit, grep, and glob for filesystem interaction
+- **Built-in tools** — Bash, file read/write/edit, and grep for filesystem interaction
 - **Inline diffs** — File write and edit operations display colored unified diffs with line numbers
 - **Markdown rendering** — Inline markdown display in the terminal with syntax highlighting
 - **Command palette** — Fuzzy-searchable command menu
@@ -61,27 +61,27 @@ deno task agent
 ## Architecture
 
 ```
-├── api/        # LLM provider integrations (OpenAI-compatible)
-├── core/       # Agent loop, tool system, session management
-├── agent/      # Application entry point and UI
-├── tui/        # Custom terminal UI framework
-├── scripts/    # Build and version bump scripts
-├── dist/       # Compiled binary output
-├── version.ts  # Version constant
+├── packages/
+│   ├── relay/              # Core agent library (@vvtxn/relay)
+│   │   ├── api/            # LLM provider types and CompletionsProvider
+│   │   └── core/           # Agent loop, runner, tools, sessions, context, display
+│   └── cli/                # CLI + TUI frontend (@vvtxn/cli)
+│       ├── agent/          # App entry point, config, components, hooks
+│       └── tui/            # Terminal UI framework (JSX runtime, Yoga layout)
+├── scripts/                # Build and version bump scripts
+├── dist/                   # Compiled binary output
+└── deno.json               # Workspace configuration
 ```
 
 ### Package Dependency Graph
 
 ```
-tui/  (leaf)     api/  (leaf)
-  ↑                ↑
-  │              core/  (depends on api/)
-  │                ↑
-  └─── agent/ ─────┘
-       (depends on tui/, core/, api/)
+packages/relay  (leaf — no internal deps)
+       ↑
+packages/cli  (depends on packages/relay + npm:@preact/signals-core + npm:yoga-layout)
 ```
 
-### `api/` — LLM Provider Layer
+### `packages/relay/api/` — LLM Provider Layer
 
 Provides an OpenAI-compatible API client with streaming SSE support. Any provider that exposes `/v1/chat/completions`
 works out of the box.
@@ -90,7 +90,7 @@ works out of the box.
 - `providers/completions.ts` — Generic completions provider with streaming and cost tracking
 - `streaming/stream.ts` — SSE stream parser
 
-### `core/` — Agent Loop & Tools
+### `packages/relay/core/` — Agent Loop & Tools
 
 The agent loop is an async generator (`run()`) that streams `AgentEvent`s:
 
@@ -108,7 +108,6 @@ The agent loop is an async generator (`run()`) that streams `AgentEvent`s:
 | `write_file`    | Write        | Write/create files (with diff)   |
 | `edit_file`     | Edit         | Edit files with diff output      |
 | `grep`          | Grep         | Search files with regex patterns |
-| `glob`          | Search       | Find files by glob pattern       |
 
 **Session persistence** — Conversations are saved to `~/.relay/sessions/` as JSONL files with automatic session
 management:
@@ -122,7 +121,7 @@ management:
 
 Sessions store a header (metadata) followed by entries: user/assistant messages and tool results.
 
-### `tui/` — Terminal UI Framework
+### `packages/cli/tui/` — Terminal UI Framework
 
 A custom terminal UI framework with:
 
@@ -154,7 +153,7 @@ A custom terminal UI framework with:
 | `useScrollArea(opts)`     | Scroll state with keyboard control  |
 | `useCommandPalette(opts)` | Command palette state and filtering |
 
-### `agent/` — Application
+### `packages/cli/agent/` — Application
 
 Ties everything together into the interactive terminal agent:
 
