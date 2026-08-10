@@ -22,7 +22,7 @@ import { config } from "./config.ts";
 import { loadApiKey } from "./auth.ts";
 import { theme } from "@/tui/theme.ts";
 import { VERSION } from "../version.ts";
-import SYSTEM_PROMPT from "./system-prompt.md" with { type: "text" };
+import { SYSTEM_PROMPT } from "@vvtxn/relay/core/system-prompt.ts";
 
 // ---------------------------------------------------------------------------
 // Config

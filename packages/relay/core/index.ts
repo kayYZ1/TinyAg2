@@ -25,3 +25,5 @@ export { sessionDir, sessionsBaseDir } from "./sessions/index.ts";
 export type { Entry, MessageEntry, Session, SessionHeader, SessionSummary, ToolResultEntry } from "./sessions/index.ts";
 
 export { homeDir, relayDir } from "./paths.ts";
+
+export { SYSTEM_PROMPT } from "./system-prompt.ts";

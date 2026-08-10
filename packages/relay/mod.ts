@@ -96,6 +96,9 @@ export type {
 // Paths
 export { homeDir, relayDir } from "./core/paths.ts";
 
+// Default system prompt
+export { SYSTEM_PROMPT } from "./core/system-prompt.ts";
+
 // API types
 export type {
 	CompletionRequest,
