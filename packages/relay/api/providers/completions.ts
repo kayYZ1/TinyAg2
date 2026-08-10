@@ -98,14 +98,13 @@ export class CompletionsProvider implements LLMProvider {
 				timeout,
 			]);
 
-			if (!response.ok) {
-				const text = await response.text().catch(() => "");
-				throw new Error(
-					`API error ${response.status}: ${text || response.statusText}\n` +
-						`URL: ${url}\n` +
-						`Model: ${body.model}`,
-				);
-			}
+		if (!response.ok) {
+			const text = await response.text().catch(() => "");
+			// Deliberately omits the request URL: it leaks server internals when
+			// errors are forwarded to clients (e.g. over HTTP/WebSocket), and the
+			// caller already knows the configured baseURL.
+			throw new Error(`API error ${response.status}: ${text || response.statusText} (model: ${body.model})`);
+		}
 
 			return response;
 		} finally {
