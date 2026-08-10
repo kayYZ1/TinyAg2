@@ -9,6 +9,10 @@ import type { ToolResult } from "@/core/tools/types.ts";
 export interface RunnerCallbacks {
 	/** Called for each text delta from the LLM stream. */
 	onTextDelta(delta: string): void | Promise<void>;
+	/** Called when the LLM starts a new tool call (before args stream in). */
+	onToolCallStart?(id: string, name: string): void | Promise<void>;
+	/** Called for each tool call arguments delta (raw JSON fragment). */
+	onToolCallArgsDelta?(id: string, args: string): void | Promise<void>;
 	/** Called when a tool call is fully received (args already accumulated). */
 	onToolCallEnd(id: string, name: string, args: string): void | Promise<void>;
 	/** Called when a tool execution completes. */
@@ -48,16 +52,18 @@ export async function runAgentLoop(
 				await callbacks.onTextDelta(event.content);
 				break;
 
-			case "tool_call_start":
-				toolCallNames.set(event.id, event.name);
-				toolCallArgs.set(event.id, "");
-				break;
+		case "tool_call_start":
+			toolCallNames.set(event.id, event.name);
+			toolCallArgs.set(event.id, "");
+			await callbacks.onToolCallStart?.(event.id, event.name);
+			break;
 
-			case "tool_call_args_delta": {
-				const current = toolCallArgs.get(event.id) ?? "";
-				toolCallArgs.set(event.id, current + event.args);
-				break;
-			}
+		case "tool_call_args_delta": {
+			const current = toolCallArgs.get(event.id) ?? "";
+			toolCallArgs.set(event.id, current + event.args);
+			await callbacks.onToolCallArgsDelta?.(event.id, event.args);
+			break;
+		}
 
 			case "tool_call_end": {
 				const name = toolCallNames.get(event.id) ?? "unknown";
