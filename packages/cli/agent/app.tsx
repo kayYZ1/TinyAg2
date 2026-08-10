@@ -5,6 +5,7 @@ import type { UIToolCall } from "@vvtxn/relay/core/display.ts";
 import type { Message, Usage } from "@vvtxn/relay/api/types.ts";
 import { CompletionsProvider } from "@vvtxn/relay/api/providers/completions.ts";
 import { createToolRegistry, defaultTools } from "@vvtxn/relay/core/tools/index.ts";
+import { expandMentions, getGitBranch } from "@vvtxn/relay/core/workspace.ts";
 import {
 	entriesToMessages,
 	type Entry,
@@ -30,17 +31,10 @@ import { SYSTEM_PROMPT } from "@vvtxn/relay/core/system-prompt.ts";
 
 const apiKey = await loadApiKey();
 
-const branchName = await new Deno.Command("git", {
-	args: ["branch", "--show-current"],
-	stdout: "piped",
-	stderr: "null",
-})
-	.output().then((o) => new TextDecoder().decode(o.stdout).trim()).catch(() => "");
+const branchName = await getGitBranch(Deno.cwd()) ?? "";
 
 const provider = new CompletionsProvider({ apiKey, baseURL: config.baseURL });
 const tools = createToolRegistry(defaultTools);
-
-import { expandMentions } from "./mention.ts";
 
 // ---------------------------------------------------------------------------
 // UI Types
@@ -178,7 +172,7 @@ function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: S
 
 	const runSubmission = async (value: string, ac: AbortController) => {
 		// Resolve @mentions: read file/directory contents and append as context
-		const expandedValue = await expandMentions(value);
+		const expandedValue = await expandMentions(value, Deno.cwd());
 
 		// Store stripped version in session (without file content bloat in history)
 		await session.value.append({ type: "message", role: "user", content: stripAttachedContext(expandedValue) });

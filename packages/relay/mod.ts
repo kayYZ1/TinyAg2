@@ -99,6 +99,9 @@ export { homeDir, relayDir } from "./core/paths.ts";
 // Default system prompt
 export { SYSTEM_PROMPT } from "./core/system-prompt.ts";
 
+// Workspace helpers (filesystem operations rooted at an explicit directory)
+export { expandMentions, getGitBranch, isGitRepo, listProjectFiles, resolveWithinRoot } from "./core/workspace.ts";
+
 // API types
 export type {
 	CompletionRequest,

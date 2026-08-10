@@ -27,3 +27,5 @@ export type { Entry, MessageEntry, Session, SessionHeader, SessionSummary, ToolR
 export { homeDir, relayDir } from "./paths.ts";
 
 export { SYSTEM_PROMPT } from "./system-prompt.ts";
+
+export { expandMentions, getGitBranch, isGitRepo, listProjectFiles, resolveWithinRoot } from "./workspace.ts";

@@ -10,8 +10,6 @@ agent/
 ├── app.tsx               # App component, signals, runSubmission, command palettes
 ├── config.ts             # Default provider config (baseURL, model)
 ├── auth.ts               # API key loading from ~/.relay/auth.json
-├── system-prompt.md      # System prompt for the LLM agent
-├── mention.ts            # @mention expansion (file/directory reading)
 ├── components/
 │   ├── chat.tsx          # MessageView, ToolCallView, DiffView, UIMessage type
 │   └── status-bar.tsx    # StatusBar, TokenBar
@@ -104,4 +102,5 @@ If any command fails, fix the issues and re-run until all pass cleanly.
 - Business logic delegates to `@vvtxn/relay`
 - Use signals for reactive UI updates
 - Handle errors gracefully with user feedback
-- `@mention` expansion is in `mention.ts`, separate from the main app logic
+- `@mention` expansion, project file listing, and git branch come from `@vvtxn/relay/core/workspace.ts` (rooted at
+  `Deno.cwd()`); the system prompt comes from `@vvtxn/relay/core/system-prompt.ts`

@@ -1,0 +1,193 @@
+/**
+ * Workspace helpers — filesystem operations rooted at an explicit directory.
+ *
+ * The workspace root is the directory an agent session operates in: the CLI
+ * passes `Deno.cwd()`, a server passes a per-session workspace directory.
+ * Every helper takes the root explicitly so the caller controls confinement.
+ */
+
+import { resolve, SEPARATOR } from "@std/path";
+
+const IGNORE_DIRS = new Set([".git", "node_modules", "dist", "out", "build", "coverage", ".next", "target", ".cache"]);
+const MAX_FILES = 10_000;
+const MENTION_RE = /@([\w./_-]+\/?)/g;
+const MAX_MENTION_OUTPUT = 10_000;
+
+/**
+ * Resolves `rel` against `root`, returning the absolute path — or null when
+ * the result escapes the root (e.g. via `..` or an absolute path).
+ */
+export function resolveWithinRoot(root: string, rel: string): string | null {
+	const normalizedRoot = resolve(root);
+	const abs = resolve(normalizedRoot, rel);
+	return abs === normalizedRoot || abs.startsWith(normalizedRoot + SEPARATOR) ? abs : null;
+}
+
+export async function isGitRepo(root: string): Promise<boolean> {
+	try {
+		const stat = await Deno.stat(`${root}/.git`);
+		return stat.isDirectory;
+	} catch {
+		return false;
+	}
+}
+
+/** Returns the current git branch for the workspace, or null when unavailable (not a repo, detached, no git). */
+export async function getGitBranch(root: string): Promise<string | null> {
+	try {
+		const result = await new Deno.Command("git", {
+			args: ["branch", "--show-current"],
+			cwd: root,
+			stdout: "piped",
+			stderr: "null",
+		}).output();
+		if (!result.success) return null;
+		return new TextDecoder().decode(result.stdout).trim() || null;
+	} catch {
+		return null;
+	}
+}
+
+async function listFilesGit(root: string): Promise<string[]> {
+	const result = await new Deno.Command("git", {
+		args: ["ls-files", "--cached", "--others", "--exclude-standard"],
+		cwd: root,
+		stdout: "piped",
+		stderr: "piped",
+	}).output();
+	if (!result.success) throw new Error("git ls-files failed");
+	const files = new TextDecoder().decode(result.stdout).trim().split("\n").filter(Boolean);
+
+	const dirs = new Set<string>();
+	for (const f of files) {
+		let idx = f.indexOf("/");
+		while (idx !== -1) {
+			dirs.add(f.slice(0, idx) + "/");
+			idx = f.indexOf("/", idx + 1);
+		}
+	}
+
+	return [...dirs, ...files].slice(0, MAX_FILES);
+}
+
+async function listFilesWalk(root: string): Promise<string[]> {
+	const files: string[] = [];
+
+	async function walk(dir: string, prefix: string) {
+		if (files.length >= MAX_FILES) return;
+		for await (const entry of Deno.readDir(dir)) {
+			if (files.length >= MAX_FILES) return;
+			if (entry.isDirectory) {
+				if (IGNORE_DIRS.has(entry.name)) continue;
+				const dirPath = prefix ? `${prefix}/${entry.name}` : entry.name;
+				files.push(dirPath + "/");
+				await walk(`${dir}/${entry.name}`, dirPath);
+			} else if (entry.isFile) {
+				files.push(prefix ? `${prefix}/${entry.name}` : entry.name);
+			}
+		}
+	}
+
+	await walk(root, "");
+	return files;
+}
+
+/**
+ * Lists project files relative to `root`: tracked + untracked files
+ * (respecting .gitignore) in git repos, a recursive walk otherwise.
+ */
+export async function listProjectFiles(root: string): Promise<string[]> {
+	if (await isGitRepo(root)) {
+		try {
+			return await listFilesGit(root);
+		} catch {
+			// git failed (e.g. not installed) — fall back to walking
+		}
+	}
+	return await listFilesWalk(root);
+}
+
+async function readDirRecursive(absDir: string, relDir: string): Promise<string> {
+	const parts: string[] = [];
+	let totalLen = 0;
+	let truncated = false;
+
+	async function walk(abs: string, rel: string) {
+		if (truncated) return;
+		let entries: Deno.DirEntry[];
+		try {
+			entries = await Array.fromAsync(Deno.readDir(abs));
+		} catch {
+			return;
+		}
+		entries.sort((a, b) => a.name.localeCompare(b.name));
+		for (const entry of entries) {
+			if (truncated) return;
+			const absPath = `${abs}/${entry.name}`;
+			const relPath = `${rel}/${entry.name}`;
+			if (entry.isDirectory) {
+				if (IGNORE_DIRS.has(entry.name)) continue;
+				await walk(absPath, relPath);
+			} else if (entry.isFile) {
+				try {
+					const content = await Deno.readTextFile(absPath);
+					const header = `--- ${relPath} ---\n`;
+					const section = header + content + "\n\n";
+					if (totalLen + section.length > MAX_MENTION_OUTPUT) {
+						const remaining = MAX_MENTION_OUTPUT - totalLen;
+						if (remaining > header.length) parts.push(header + content.slice(0, remaining - header.length));
+						truncated = true;
+						return;
+					}
+					parts.push(section);
+					totalLen += section.length;
+				} catch {
+					// skip binary / unreadable
+				}
+			}
+		}
+	}
+
+	await walk(absDir.replace(/\/+$/, ""), relDir.replace(/\/+$/, ""));
+	let result = parts.join("");
+	if (truncated) result += "\n...(truncated)";
+	return result || "(empty directory)";
+}
+
+/**
+ * Expands `@path` mentions in `text` by appending file/directory contents as
+ * an `<attached_context>` block. Paths are resolved within `root`; mentions
+ * that escape the root or don't exist are left as-is.
+ */
+export async function expandMentions(text: string, root: string): Promise<string> {
+	const contextBlocks: string[] = [];
+	const seen = new Set<string>();
+
+	for (const match of text.matchAll(MENTION_RE)) {
+		const relPath = match[1];
+		if (seen.has(relPath)) continue;
+		seen.add(relPath);
+
+		const absPath = resolveWithinRoot(root, relPath);
+		if (!absPath) continue;
+
+		try {
+			const stat = await Deno.stat(absPath);
+			if (stat.isDirectory) {
+				contextBlocks.push(await readDirRecursive(absPath, relPath));
+			} else if (stat.isFile) {
+				const raw = await Deno.readTextFile(absPath);
+				const content = raw.length > MAX_MENTION_OUTPUT
+					? raw.slice(0, MAX_MENTION_OUTPUT) + "\n...(truncated)"
+					: raw;
+				contextBlocks.push(`--- ${relPath} ---\n${content}`);
+			}
+		} catch {
+			// path doesn't exist or can't be read — leave mention as-is
+		}
+	}
+
+	if (contextBlocks.length === 0) return text;
+
+	return `${text}\n\n<attached_context>\n${contextBlocks.join("\n\n")}\n</attached_context>`;
+}

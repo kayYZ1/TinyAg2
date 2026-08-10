@@ -12,6 +12,9 @@ core/
 ├── display.ts            # Display utilities: UIToolCall, parseDiffLines, tool arg/output formatting
 ├── paths.ts              # relayDir(), homeDir() helpers
 ├── context.ts            # Context trimming (token estimation, turn-based truncation)
+├── system-prompt.ts      # Re-exports the default system prompt (raw .md import)
+├── system-prompt.md      # Default system prompt for coding agents (shared across clients)
+├── workspace.ts          # Workspace-rooted fs helpers: expandMentions, listProjectFiles, git metadata
 ├── tools/                # Tool system
 │   ├── index.ts          # Tool exports and defaultTools registry
 │   ├── types.ts          # Tool, ToolRegistry, ToolResult types; defineTool helper
@@ -29,11 +32,13 @@ core/
 └── tests/
     ├── agent.test.ts     # Agent loop tests
     ├── bash.test.ts      # Bash tool tests
-    ├── context.test.ts   # Context trimming tests
-    ├── edit.test.ts      # Edit tool tests
-    ├── read.test.ts      # Read tool tests
-    ├── session.test.ts   # Session management tests
-    └── write.test.ts     # Write tool tests
+    ├── context.test.ts     # Context trimming tests
+    ├── edit.test.ts        # Edit tool tests
+    ├── read.test.ts        # Read tool tests
+    ├── runner.test.ts      # Runner callback tests
+    ├── session.test.ts     # Session management tests
+    ├── workspace.test.ts   # Workspace helper tests
+    └── write.test.ts       # Write tool tests
 ```
 
 ## Key Concepts
@@ -70,6 +75,9 @@ await runAgentLoop(messages, config, {
 
 All callbacks return `void | Promise<void>` and the runner awaits each one, ensuring async work (e.g. session writes)
 completes in order.
+
+Optional callbacks `onToolCallStart(id, name)` and `onToolCallArgsDelta(id, args)` stream tool call progress as it
+arrives (e.g. for progressive UI indicators); without them, only `onToolCallEnd` fires with the accumulated args.
 
 ### AgentEvent Types
 
@@ -127,6 +135,16 @@ Built-in tools (`defaultTools`): `bash` (Run), `read_file` (Read), `write_file` 
 - CRUD operations: create, list, load, save, delete
 - Each session contains message history and metadata
 
+### Workspace Helpers (`workspace.ts`)
+
+Filesystem helpers rooted at an explicit workspace directory — the CLI passes `Deno.cwd()`, a server passes a
+per-session workspace:
+
+- `resolveWithinRoot(root, rel)` — resolves a path, returning null when it escapes the root
+- `expandMentions(text, root)` — expands `@path` mentions into `<attached_context>` blocks
+- `listProjectFiles(root)` — project file listing (`git ls-files`, directory walk fallback) for file pickers
+- `isGitRepo(root)` / `getGitBranch(root)` — repository metadata
+
 ## Dependencies
 
 - `@/api` - Internal: LLM provider types and calls (within same `packages/relay` package)
@@ -151,3 +169,4 @@ If any command fails, fix the issues and re-run until all pass cleanly.
 - Agent loop is an async generator for streaming updates
 - `runAgentLoop()` is the recommended entry point for all clients; `run()` for custom event handling
 - Context trimming uses heuristic token estimation (~4 chars/token)
+- Workspace helpers take an explicit root directory — never rely on the process cwd
