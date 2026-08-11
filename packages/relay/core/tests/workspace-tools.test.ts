@@ -1,13 +1,9 @@
 import { assert, assertEquals } from "@std/assert";
-import { createWorkspaceTools } from "@/core/tools/index.ts";
+import { createToolRegistry, createWorkspaceTools } from "@/core/tools/index.ts";
 import type { Tool, ToolRegistry } from "@/core/tools/types.ts";
 
 function registry(root: string): ToolRegistry {
-	const reg: ToolRegistry = new Map();
-	for (const tool of createWorkspaceTools(root)) {
-		reg.set(tool.definition.function.name, tool);
-	}
-	return reg;
+	return createToolRegistry(createWorkspaceTools(root));
 }
 
 function tool(reg: ToolRegistry, name: string): Tool {

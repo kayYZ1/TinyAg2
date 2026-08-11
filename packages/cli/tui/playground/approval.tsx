@@ -1,9 +1,8 @@
 import { run } from "@/tui/render/index.ts";
 import { ApprovalPrompt, Box, Text } from "@/tui/render/components.tsx";
-import { useSignal } from "@/tui/render/hooks/signals.ts";
+import { getHookKey, hasCleanup, setCleanup, useSignal } from "@/tui/render/hooks/signals.ts";
 import { type ApprovalDecision, useApprovalPrompt } from "@/tui/render/hooks/approval.ts";
 import { inputManager, type KeyEvent } from "@/tui/core/input.ts";
-import { getHookKey, hasCleanup, setCleanup } from "@/tui/render/hooks/signals.ts";
 
 const DEMO_TOOLS = [
 	{ toolName: "Run", summary: "git status" },
