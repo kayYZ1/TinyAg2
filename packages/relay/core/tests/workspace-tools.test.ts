@@ -53,12 +53,14 @@ Deno.test("workspace tools reject paths escaping the root", async () => {
 		await Deno.writeTextFile(`${parent}/secret.txt`, "top secret");
 		const tools = registry(root);
 
-		for (const [name, input] of [
-			["read_file", { path: "../secret.txt" }],
-			["write_file", { path: "../escape.txt", content: "x" }],
-			["edit_file", { path: "../secret.txt", old_str: "top", new_str: "not" }],
-			["grep", { pattern: "secret", path: ".." }],
-		] as const) {
+		for (
+			const [name, input] of [
+				["read_file", { path: "../secret.txt" }],
+				["write_file", { path: "../escape.txt", content: "x" }],
+				["edit_file", { path: "../secret.txt", old_str: "top", new_str: "not" }],
+				["grep", { pattern: "secret", path: ".." }],
+			] as const
+		) {
 			const result = await tool(tools, name).execute(input);
 			assertEquals(result.isError, true, `${name} should reject escaping path`);
 			assert(result.content.includes("outside the workspace"), `${name} should explain the confinement`);

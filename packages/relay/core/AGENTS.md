@@ -16,9 +16,10 @@ core/
 ├── system-prompt.md      # Default system prompt for coding agents (shared across clients)
 ├── workspace.ts          # Workspace-rooted fs helpers: expandMentions, listProjectFiles, git metadata
 ├── tools/                # Tool system
-│   ├── index.ts          # Tool exports and defaultTools registry
+│   ├── index.ts          # Tool exports, defaultTools registry, createWorkspaceTools
 │   ├── types.ts          # Tool, ToolRegistry, ToolResult types; defineTool helper
-│   ├── bash.ts           # Shell command execution
+│   ├── approval.ts       # withApproval wrapper (gate tool execution on user decision)
+│   ├── bash.ts           # Shell command execution (createBashTool factory, optional cwd)
 │   ├── read.ts           # File reading
 │   ├── write.ts          # File writing
 │   ├── edit.ts           # File editing (find-and-replace)
@@ -31,13 +32,15 @@ core/
 │   └── types.ts          # Session types
 └── tests/
     ├── agent.test.ts     # Agent loop tests
+    ├── approval.test.ts  # Tool approval wrapper tests
     ├── bash.test.ts      # Bash tool tests
     ├── context.test.ts     # Context trimming tests
     ├── edit.test.ts        # Edit tool tests
     ├── read.test.ts        # Read tool tests
     ├── runner.test.ts      # Runner callback tests
-    ├── session.test.ts     # Session management tests
+    ├── session.test.ts   # Session management tests
     ├── workspace.test.ts   # Workspace helper tests
+    ├── workspace-tools.test.ts # Workspace-rooted tool tests
     └── write.test.ts       # Write tool tests
 ```
 
@@ -119,6 +122,14 @@ interface Tool {
 Built-in tools (`defaultTools`): `bash` (Run), `read_file` (Read), `write_file` (Write), `edit_file` (Edit), `grep`
 (Grep)
 
+`createWorkspaceTools(root)` returns the built-in tools rooted at a workspace directory: file tools resolve their `path`
+argument against `root` via `resolveWithinRoot` (escapes are rejected with an error result), and bash runs with `root`
+as its cwd. Note bash is not truly confined — shell commands can still use absolute paths.
+
+`withApproval(tools, handler)` wraps each tool's `execute` so calls are gated on an approval decision. Readonly tools
+skip approval by default (`skipReadonly: false` to change). Denials return an `isError` ToolResult, so the agent loop
+needs no changes and the model can react. Handlers waiting on user input should race against the run's AbortSignal.
+
 ### Context Management
 
 `trimContext()` in `context.ts` trims messages to fit a token budget:
@@ -170,3 +181,4 @@ If any command fails, fix the issues and re-run until all pass cleanly.
 - `runAgentLoop()` is the recommended entry point for all clients; `run()` for custom event handling
 - Context trimming uses heuristic token estimation (~4 chars/token)
 - Workspace helpers take an explicit root directory — never rely on the process cwd
+- Gate side-effecting tools with `withApproval()`; keep `defaultTools` ungated only where approvals don't apply

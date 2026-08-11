@@ -30,7 +30,8 @@ tui/
 │   │   ├── text-input.ts       # useTextInput hook (with vim mode support)
 │   │   ├── text-utils.ts       # Shared text editing utilities (TextState)
 │   │   ├── scroll-area.ts      # useScrollArea hook
-│   │   └── command-palette.ts  # useCommandPalette hook
+│   │   ├── command-palette.ts  # useCommandPalette hook
+│   │   └── approval.ts         # useApprovalPrompt hook (tool approval decisions)
 │   ├── elements/               # Element handlers for rendering
 │   │   ├── index.ts            # Element registry (registerElement, getElement)
 │   │   ├── box.ts              # Box element renderer + layout
@@ -40,11 +41,13 @@ tui/
 │   │   └── scroll-area.ts      # ScrollArea element renderer + layout
 │   ├── components/
 │   │   ├── command-palette.tsx  # CommandPalette component
+│   │   ├── approval-prompt.tsx  # ApprovalPrompt component (tool approval overlay)
 │   │   └── welcome-screen.tsx  # WelcomeScreen component
 │   └── types/
 │       └── index.ts            # TypeScript type definitions, ElementRegistry, props
 ├── playground/                 # Example apps
 │   ├── agent.tsx               # Agent UI demo
+│   ├── approval.tsx            # Approval prompt demo
 │   ├── command-palette.tsx     # Command palette demo
 │   ├── layout.tsx              # Flexbox layout demo
 │   ├── markdown.tsx            # Markdown rendering demo
@@ -135,6 +138,8 @@ All exported from `render/components.tsx`:
 - **`Markdown`** - Renders markdown content as styled Text lines via `parseMarkdown()`
 - **`WelcomeScreen`** - Welcome screen with version display, re-exported from `components/welcome-screen.tsx`
 - **`CommandPalette`** - Re-exported from `components/command-palette.tsx`
+- **`ApprovalPrompt`** - Modal tool-approval overlay (y allow / a always / n deny), re-exported from
+  `components/approval-prompt.tsx`
 
 ## Hooks
 
@@ -145,6 +150,9 @@ All exported from `render/hooks/index.ts`:
 - **`useTextInput(options)`** - Text input state management with optional vim mode (`VimMode: "NORMAL" | "INSERT"`)
 - **`useScrollArea(options)`** - Scroll state management with keyboard input and auto-scroll
 - **`useCommandPalette(options)`** - Command palette state (items, filtering, selection)
+- **`useApprovalPrompt()`** - Tool approval state; `ask(request)` returns a Promise resolving with the decision ("allow"
+  | "always" | "deny"), `cancel()` denies any pending request. Register before other global key handlers so Esc denies a
+  pending prompt instead of triggering cancel.
 
 ## Adding New Features
 

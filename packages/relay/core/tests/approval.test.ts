@@ -79,7 +79,7 @@ Deno.test("withApproval gates readonly tools when skipReadonly is false", async 
 	assertEquals(calls.length, 0);
 });
 
-Deno.test("withApproval preserves tool definitions and readonly flags", async () => {
+Deno.test("withApproval preserves tool definitions and readonly flags", () => {
 	const { tool } = makeTool("grep", true);
 	const [wrapped] = withApproval([tool], () => Promise.resolve(true));
 

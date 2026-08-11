@@ -71,6 +71,7 @@ Defaults in `config.ts`:
 - Vim-style input via `useTextInput`
 - Command palette (new chat, threads, quit) via `useCommandPalette`
 - File mentions via `@` with project file indexing
+- Tool approval prompts (`ApprovalPrompt`) for side-effecting tools, with per-process "always allow" memory
 - Double Esc to cancel in-progress generation
 - Token usage and cost tracking (including OpenRouter generation stats)
 - Session persistence with thread switching
@@ -104,3 +105,5 @@ If any command fails, fix the issues and re-run until all pass cleanly.
 - Handle errors gracefully with user feedback
 - `@mention` expansion, project file listing, and git branch come from `@vvtxn/relay/core/workspace.ts` (rooted at
   `Deno.cwd()`); the system prompt comes from `@vvtxn/relay/core/system-prompt.ts`
+- Tools are workspace-rooted (`createWorkspaceTools(Deno.cwd())`) and gated via `withApproval` + `useApprovalPrompt`;
+  the approval hook must be registered before the double-Esc cancel handler
