@@ -33,19 +33,19 @@ export function ApprovalPrompt(props: ApprovalPromptProps) {
 					<Text color={theme.textMuted}>{pending.summary}</Text>
 				</Box>
 				<Box flexDirection="row" gap={2}>
-					<Box flexDirection="row">
+					<Box flexDirection="row" gap={1}>
 						<Text bold color={theme.success}>
 							y
 						</Text>
 						<Text color={theme.textDim}>allow once</Text>
 					</Box>
-					<Box flexDirection="row">
+					<Box flexDirection="row" gap={1}>
 						<Text bold color={theme.accent}>
 							a
 						</Text>
 						<Text color={theme.textDim}>always allow</Text>
 					</Box>
-					<Box flexDirection="row">
+					<Box flexDirection="row" gap={1}>
 						<Text bold color={theme.error}>
 							n
 						</Text>
