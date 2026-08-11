@@ -78,8 +78,15 @@ export { estimateMessageTokens, estimateTokens, trimContext } from "./core/conte
 export type { TrimOptions } from "./core/context.ts";
 
 // Tools
-export { createToolRegistry, defaultTools, defineTool, getDefinitions } from "./core/tools/index.ts";
+export {
+	createToolRegistry,
+	createWorkspaceTools,
+	defaultTools,
+	defineTool,
+	getDefinitions,
+} from "./core/tools/index.ts";
 export type { Tool, ToolRegistry, ToolResult } from "./core/tools/index.ts";
+export { type ApprovalHandler, type ApprovalOptions, withApproval } from "./core/tools/approval.ts";
 
 // Sessions
 export { entriesToMessages, SessionManager, stripAttachedContext } from "./core/sessions/index.ts";
