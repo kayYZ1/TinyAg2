@@ -25,12 +25,13 @@ agent/
 
 - **Relay library** (`@vvtxn/relay`) — agent loop, tools, sessions, display utilities
 - **TUI framework** (`@/tui`) — terminal rendering, components, hooks, input handling
-- **Local modules** — config, auth, mention expansion, UI components
+- **Local modules** — config, auth, UI components
 
 ```typescript
 import { runAgentLoop } from "@vvtxn/relay/core/runner.ts";
 import { CompletionsProvider } from "@vvtxn/relay/api/providers/completions.ts";
-import { createToolRegistry, defaultTools } from "@vvtxn/relay/core/tools/index.ts";
+import { createToolRegistry, createWorkspaceTools } from "@vvtxn/relay/core/tools/index.ts";
+import { withApproval } from "@vvtxn/relay/core/tools/approval.ts";
 import { StatusBar } from "./components/status-bar.tsx";
 import { MessageView } from "./components/chat.tsx";
 ```

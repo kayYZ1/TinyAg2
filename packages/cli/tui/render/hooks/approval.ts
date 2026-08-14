@@ -49,11 +49,23 @@ export function useApprovalPrompt() {
 		setCleanup(key, cleanup);
 	}
 
+	// Serialize concurrent asks: each request waits for the previous one to be
+	// answered, so a new prompt never overwrites an unanswered one (which would
+	// hang its caller). The agent loop already serializes side-effect tools,
+	// but this keeps the hook correct for parallel approval policies too.
+	// Stored in a signal so the chain survives re-renders (plain locals reset).
+	const tail = useSignal<Promise<void>>(Promise.resolve());
+
 	/** Opens the prompt and resolves with the user's decision. */
 	const ask = (request: ApprovalRequest): Promise<ApprovalDecision> => {
-		return new Promise((resolve) => {
-			pending.value = { ...request, resolve };
-		});
+		const task = tail.value.then(
+			() =>
+				new Promise<ApprovalDecision>((resolve) => {
+					pending.value = { ...request, resolve };
+				}),
+		);
+		tail.value = task.then(() => undefined);
+		return task;
 	};
 
 	/** Resolves any pending request as "deny" and closes the prompt (e.g. on abort). */
