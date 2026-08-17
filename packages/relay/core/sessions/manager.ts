@@ -180,7 +180,7 @@ export class SessionManager {
 					}
 				}
 
-				summaries.push({ id: header.id, path: filePath, timestamp: header.timestamp, firstUserMessage });
+				summaries.push({ id: header.id, reference: filePath, timestamp: header.timestamp, firstUserMessage });
 			} catch {
 				// Skip corrupt files
 			}

@@ -2,7 +2,7 @@ import { assertEquals, assertExists } from "@std/assert";
 import { join } from "@std/path/join";
 import { FileSessionStore } from "@/core/sessions/file.ts";
 import { entriesToMessages, SessionManager } from "@/core/sessions/manager.ts";
-import type { Entry, MessageEntry } from "@/core/sessions/types.ts";
+import type { Entry, MessageEntry, SessionScope } from "@/core/sessions/types.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -31,10 +31,11 @@ Deno.test(
 	"FileSessionStore exposes the storage-neutral session contract",
 	withTempHome(async () => {
 		const store = new FileSessionStore();
-		const session = store.create("/tmp/project");
+		const scope: SessionScope = { ownerId: "testuser", cwd: "/tmp/project" };
+		const session = store.create(scope);
 
 		await session.append({ type: "message", role: "user", content: "hello" });
-		const summaries = await store.listSummaries("/tmp/project");
+		const summaries = await store.listSummaries(scope);
 
 		assertEquals(summaries.length, 1);
 		assertEquals(summaries[0].id, session.getHeader().id);
@@ -295,6 +296,6 @@ Deno.test(
 		assertEquals(summaries[0].id, "sum123");
 		assertEquals(summaries[0].timestamp, "2025-06-15T12:00:00.000Z");
 		assertEquals(summaries[0].firstUserMessage, "What is Deno?");
-		assertEquals(summaries[0].path, filePath);
+		assertEquals(summaries[0].reference, filePath);
 	}),
 );

@@ -57,9 +57,15 @@ export interface Session {
 
 export interface SessionSummary {
 	id: string;
-	path: string;
+	/** Opaque value passed back to SessionStore.open(). */
+	reference: string;
 	timestamp: string;
 	firstUserMessage: string | null;
+}
+
+export interface SessionScope {
+	ownerId: string;
+	cwd: string;
 }
 
 /** Storage-backed session handle shared by filesystem and database stores. */
@@ -76,10 +82,10 @@ export interface SessionHandle {
 
 /** Minimal store contract required by frontends to manage sessions. */
 export interface SessionStore {
-	create(cwd: string): SessionHandle;
-	continueRecent(cwd: string): Promise<SessionHandle | null>;
-	open(reference: string): Promise<SessionHandle>;
-	listSummaries(cwd: string): Promise<SessionSummary[]>;
+	create(scope: SessionScope): SessionHandle;
+	continueRecent(scope: SessionScope): Promise<SessionHandle | null>;
+	open(reference: string, ownerId: string): Promise<SessionHandle>;
+	listSummaries(scope: SessionScope): Promise<SessionSummary[]>;
 }
 
 export const CURRENT_VERSION = 1;

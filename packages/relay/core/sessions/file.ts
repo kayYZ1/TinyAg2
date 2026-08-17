@@ -1,5 +1,5 @@
 import { SessionManager } from "./manager.ts";
-import type { SessionHandle, SessionStore, SessionSummary } from "./types.ts";
+import type { SessionHandle, SessionScope, SessionStore, SessionSummary } from "./types.ts";
 
 /**
  * Storage contract adapter for the existing JSONL session implementation.
@@ -9,19 +9,19 @@ import type { SessionHandle, SessionStore, SessionSummary } from "./types.ts";
  * CLI migration and persistence semantics in the same step.
  */
 export class FileSessionStore implements SessionStore {
-	create(cwd: string): SessionHandle {
-		return SessionManager.create(cwd);
+	create(scope: SessionScope): SessionHandle {
+		return SessionManager.create(scope.cwd);
 	}
 
-	async continueRecent(cwd: string): Promise<SessionHandle | null> {
-		return await SessionManager.continueRecent(cwd);
+	async continueRecent(scope: SessionScope): Promise<SessionHandle | null> {
+		return await SessionManager.continueRecent(scope.cwd);
 	}
 
-	async open(reference: string): Promise<SessionHandle> {
+	async open(reference: string, _ownerId: string): Promise<SessionHandle> {
 		return await SessionManager.open(reference);
 	}
 
-	async listSummaries(cwd: string): Promise<SessionSummary[]> {
-		return await SessionManager.listSummaries(cwd);
+	async listSummaries(scope: SessionScope): Promise<SessionSummary[]> {
+		return await SessionManager.listSummaries(scope.cwd);
 	}
 }

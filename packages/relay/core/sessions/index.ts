@@ -8,6 +8,7 @@ export type {
 	Session,
 	SessionHandle,
 	SessionHeader,
+	SessionScope,
 	SessionStore,
 	SessionSummary,
 	ToolResultEntry,

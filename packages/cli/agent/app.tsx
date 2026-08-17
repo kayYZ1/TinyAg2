@@ -12,6 +12,7 @@ import {
 	type Entry,
 	FileSessionStore,
 	type SessionHandle,
+	type SessionScope,
 	stripAttachedContext,
 } from "@vvtxn/relay/core/sessions/index.ts";
 import { run } from "@/tui/render/index.ts";
@@ -47,6 +48,10 @@ const branchName = await getGitBranch(Deno.cwd()) ?? "";
 
 const provider = new CompletionsProvider({ apiKey, baseURL: config.baseURL });
 const sessionStore = new FileSessionStore();
+const sessionScope: SessionScope = {
+	ownerId: Deno.env.get("RELAY_OWNER_ID") ?? Deno.env.get("USER") ?? Deno.env.get("USERNAME") ?? "default",
+	cwd: Deno.cwd(),
+};
 const workspaceTools = createWorkspaceTools(Deno.cwd());
 /** Tools the user chose to always allow (process-lifetime memory). */
 const alwaysApprovedTools = new Set<string>();
@@ -389,7 +394,7 @@ function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: S
 			if (isLoading.value) return;
 			session.value.flush();
 			currentSession = null;
-			sessionStore.open(item.id).then((sm) => {
+			sessionStore.open(item.id, sessionScope.ownerId).then((sm) => {
 				session.value = sm;
 				currentSession = sm;
 				uiMessages.value = entriesToUIMessages(sm.getEntries());
@@ -435,11 +440,11 @@ function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: S
 				tokenCount.value = 0;
 				totalCost.value = 0;
 				sessionId.value++;
-				const newSm = sessionStore.create(Deno.cwd());
+				const newSm = sessionStore.create(sessionScope);
 				session.value = newSm;
 				currentSession = newSm;
 			} else if (item.id === "threads") {
-				sessionStore.listSummaries(Deno.cwd()).then((summaries) => {
+				sessionStore.listSummaries(sessionScope).then((summaries) => {
 					threadItems.value = summaries.map((s) => {
 						const date = new Date(s.timestamp);
 						const label = date.toLocaleString();
@@ -448,7 +453,7 @@ function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: S
 								? s.firstUserMessage.slice(0, 45) + "…"
 								: s.firstUserMessage
 							: "(empty session)";
-						return { id: s.path, title: preview, description: label, keywords: [s.id] };
+						return { id: s.reference, title: preview, description: label, keywords: [s.id] };
 					});
 					threadsPalette.openPalette();
 				});
@@ -556,6 +561,6 @@ async function beforeQuit() {
 // Entry
 // ---------------------------------------------------------------------------
 
-const initialSession = sessionStore.create(Deno.cwd());
+const initialSession = sessionStore.create(sessionScope);
 currentSession = initialSession;
 run((quit) => <App onQuit={quit} initialSession={initialSession} />, beforeQuit);
