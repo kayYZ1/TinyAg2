@@ -20,7 +20,7 @@ class FakeClient {
 
 function storeWithFake(fake: FakeClient): DatabaseSessionStore {
 	const options: DatabaseSessionStoreOptions = {
-		url: "libsql://example.turso.io",
+		url: "turso://example",
 		authToken: "test-token",
 		client: fake as unknown as NonNullable<DatabaseSessionStoreOptions["client"]>,
 	};

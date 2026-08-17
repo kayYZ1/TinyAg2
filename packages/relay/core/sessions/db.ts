@@ -1,4 +1,4 @@
-import { type Client, createClient } from "@libsql/client/web";
+import { createClient } from "@tursodatabase/serverless/compat";
 import type { Entry, NewEntry, SessionHandle, SessionScope, SessionStore, SessionSummary } from "./types.ts";
 import { CURRENT_VERSION } from "./types.ts";
 
@@ -32,7 +32,7 @@ CREATE INDEX IF NOT EXISTS session_entries_session_seq_idx
 type QueryArgs = (string | number | null)[];
 type Statement = { sql: string; args?: QueryArgs };
 type Result = { rows: Record<string, unknown>[] };
-type DatabaseClient = Pick<Client, "execute" | "batch">;
+type DatabaseClient = Pick<ReturnType<typeof createClient>, "execute" | "batch">;
 
 export interface DatabaseSessionStoreOptions {
 	url: string;

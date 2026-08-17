@@ -6,6 +6,6 @@
 	},
 	"imports": {
 		"@/": "./",
-		"@libsql/client": "npm:@libsql/client@^0.17.4"
+		"@tursodatabase/serverless/compat": "npm:@tursodatabase/serverless@^1.4.0/compat"
 	}
 }
