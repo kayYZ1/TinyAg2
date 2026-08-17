@@ -90,6 +90,7 @@ export { type ApprovalHandler, type ApprovalOptions, withApproval } from "./core
 
 // Sessions
 export { entriesToMessages, FileSessionStore, SessionManager, stripAttachedContext } from "./core/sessions/index.ts";
+export { DatabaseSessionStore } from "./core/sessions/index.ts";
 export { sessionDir, sessionsBaseDir } from "./core/sessions/index.ts";
 export type {
 	Entry,

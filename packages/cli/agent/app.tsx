@@ -8,9 +8,9 @@ import { createToolRegistry, createWorkspaceTools } from "@vvtxn/relay/core/tool
 import { type ApprovalHandler, withApproval } from "@vvtxn/relay/core/tools/approval.ts";
 import { expandMentions, getGitBranch } from "@vvtxn/relay/core/workspace.ts";
 import {
+	DatabaseSessionStore,
 	entriesToMessages,
 	type Entry,
-	FileSessionStore,
 	type SessionHandle,
 	type SessionScope,
 	stripAttachedContext,
@@ -47,9 +47,11 @@ const apiKey = await loadApiKey();
 const branchName = await getGitBranch(Deno.cwd()) ?? "";
 
 const provider = new CompletionsProvider({ apiKey, baseURL: config.baseURL });
-const sessionStore = new FileSessionStore();
+const sessionStore = DatabaseSessionStore.fromEnv();
 const sessionScope: SessionScope = {
-	ownerId: Deno.env.get("RELAY_OWNER_ID") ?? Deno.env.get("USER") ?? Deno.env.get("USERNAME") ?? "default",
+	ownerId: Deno.env.get("RELAY_OWNER_ID") ?? (() => {
+		throw new Error("RELAY_OWNER_ID is required");
+	})(),
 	cwd: Deno.cwd(),
 };
 const workspaceTools = createWorkspaceTools(Deno.cwd());

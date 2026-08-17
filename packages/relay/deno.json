@@ -5,6 +5,7 @@
 		".": "./mod.ts"
 	},
 	"imports": {
-		"@/": "./"
+		"@/": "./",
+		"@libsql/client": "npm:@libsql/client@^0.17.4"
 	}
 }

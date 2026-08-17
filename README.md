@@ -109,17 +109,18 @@ The agent loop is an async generator (`run()`) that streams `AgentEvent`s:
 | `edit_file`     | Edit         | Edit files with diff output      |
 | `grep`          | Grep         | Search files with regex patterns |
 
-**Session persistence** — Conversations are saved to `~/.relay/sessions/` as JSONL files with automatic session
-management:
+**Session persistence** — Conversations are stored in the shared database and can be shared by the terminal and web
+clients. The terminal requires `TURSO_DB_URL`, `TURSO_DB_TOKEN`, and a shared `RELAY_OWNER_ID`:
 
 - **Create** — New sessions with unique IDs and timestamps
 - **Continue** — Resume the most recent session for a workspace
-- **Open** — Load a specific session by file path
+- **Open** — Load a specific session by opaque session ID
 - **List** — Browse all sessions with summaries (first user message preview)
 - **Cleanup** — Automatic retention of the 7 most recent sessions
 - **Token tracking** — Per-session token counts persisted in headers
 
-Sessions store a header (metadata) followed by entries: user/assistant messages and tool results.
+Sessions store metadata plus ordered entries: user/assistant messages and tool results. The workspace path is part of
+the session scope, so sessions from different projects remain separate.
 
 ### `packages/cli/tui/` — Terminal UI Framework
 
