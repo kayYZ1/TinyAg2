@@ -50,6 +50,9 @@ Set your API key:
 
 ```bash
 export LLM_API_KEY="your-api-key"
+export TURSO_DB_URL="your-database-url"
+export TURSO_DB_TOKEN="your-database-token"
+export RELAY_OWNER_ID="your-user-id"
 ```
 
 ### Run
@@ -199,9 +202,11 @@ Tag-based releases via GitHub Actions (`.github/workflows/release.yml`):
 1. `deno task version:bump <patch|minor|major>`
 2. Commit and push to `main`
 3. `git tag v<version> && git push --tags`
-4. CI builds Linux binary and creates GitHub Release
+4. CI builds the Linux binary without embedding environment files and creates the GitHub Release
 
-This triggers CI to build the Linux binary and publish a GitHub Release.
+The released binary reads `LLM_API_KEY`, `TURSO_DB_URL`, `TURSO_DB_TOKEN`, and `RELAY_OWNER_ID` from its runtime
+environment. Local `deno task build` builds may load `.env` automatically, but release builds should not include secrets
+in the executable.
 
 ## License
 
