@@ -1,5 +1,6 @@
 import { assertEquals, assertExists } from "@std/assert";
 import { join } from "@std/path/join";
+import { FileSessionStore } from "@/core/sessions/file.ts";
 import { entriesToMessages, SessionManager } from "@/core/sessions/manager.ts";
 import type { Entry, MessageEntry } from "@/core/sessions/types.ts";
 
@@ -25,6 +26,21 @@ function withTempHome(
 		}
 	};
 }
+
+Deno.test(
+	"FileSessionStore exposes the storage-neutral session contract",
+	withTempHome(async () => {
+		const store = new FileSessionStore();
+		const session = store.create("/tmp/project");
+
+		await session.append({ type: "message", role: "user", content: "hello" });
+		const summaries = await store.listSummaries("/tmp/project");
+
+		assertEquals(summaries.length, 1);
+		assertEquals(summaries[0].id, session.getHeader().id);
+		assertEquals(session.getEntries()[0].type, "message");
+	}),
+);
 
 // ---------------------------------------------------------------------------
 // create

@@ -41,6 +41,11 @@ export interface ToolResultEntry extends EntryBase {
 
 export type Entry = MessageEntry | ToolResultEntry;
 
+/** Entry input before the store assigns its id and timestamp. */
+export type NewEntry =
+	| Omit<MessageEntry, "id" | "timestamp">
+	| Omit<ToolResultEntry, "id" | "timestamp">;
+
 // ---------------------------------------------------------------------------
 // In-memory session
 // ---------------------------------------------------------------------------
@@ -55,6 +60,26 @@ export interface SessionSummary {
 	path: string;
 	timestamp: string;
 	firstUserMessage: string | null;
+}
+
+/** Storage-backed session handle shared by filesystem and database stores. */
+export interface SessionHandle {
+	append(entry: NewEntry): Promise<string>;
+	getEntries(): Entry[];
+	getHeader(): SessionHeader;
+	getTokens(): number;
+	setTokens(tokens: number): void;
+	getCost(): number;
+	setCost(cost: number): void;
+	flush(): Promise<void>;
+}
+
+/** Minimal store contract required by frontends to manage sessions. */
+export interface SessionStore {
+	create(cwd: string): SessionHandle;
+	continueRecent(cwd: string): Promise<SessionHandle | null>;
+	open(reference: string): Promise<SessionHandle>;
+	listSummaries(cwd: string): Promise<SessionSummary[]>;
 }
 
 export const CURRENT_VERSION = 1;

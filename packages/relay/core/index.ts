@@ -21,9 +21,19 @@ export { createToolRegistry, createWorkspaceTools, defaultTools, defineTool, get
 export type { Tool, ToolRegistry, ToolResult } from "./tools/index.ts";
 export { type ApprovalHandler, type ApprovalOptions, withApproval } from "./tools/approval.ts";
 
-export { entriesToMessages, SessionManager, stripAttachedContext } from "./sessions/index.ts";
+export { entriesToMessages, FileSessionStore, SessionManager, stripAttachedContext } from "./sessions/index.ts";
 export { sessionDir, sessionsBaseDir } from "./sessions/index.ts";
-export type { Entry, MessageEntry, Session, SessionHeader, SessionSummary, ToolResultEntry } from "./sessions/index.ts";
+export type {
+	Entry,
+	MessageEntry,
+	NewEntry,
+	Session,
+	SessionHandle,
+	SessionHeader,
+	SessionStore,
+	SessionSummary,
+	ToolResultEntry,
+} from "./sessions/index.ts";
 
 export { homeDir, relayDir } from "./paths.ts";
 
