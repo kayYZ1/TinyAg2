@@ -10,7 +10,8 @@ import { expandMentions, getGitBranch } from "@vvtxn/relay/core/workspace.ts";
 import {
 	entriesToMessages,
 	type Entry,
-	SessionManager,
+	FileSessionStore,
+	type SessionHandle,
 	stripAttachedContext,
 } from "@vvtxn/relay/core/sessions/index.ts";
 import { run } from "@/tui/render/index.ts";
@@ -45,6 +46,7 @@ const apiKey = await loadApiKey();
 const branchName = await getGitBranch(Deno.cwd()) ?? "";
 
 const provider = new CompletionsProvider({ apiKey, baseURL: config.baseURL });
+const sessionStore = new FileSessionStore();
 const workspaceTools = createWorkspaceTools(Deno.cwd());
 /** Tools the user chose to always allow (process-lifetime memory). */
 const alwaysApprovedTools = new Set<string>();
@@ -125,7 +127,7 @@ function entriesToUIMessages(entries: Entry[]): UIMessage[] {
 	return messages;
 }
 
-function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: SessionManager }) {
+function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: SessionHandle }) {
 	// Registered first so a pending approval consumes keys (Esc denies) before
 	// the double-Esc cancel handler below sees them.
 	const approval = useApprovalPrompt();
@@ -138,7 +140,7 @@ function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: S
 	const totalCost = useSignal(0);
 	const sessionId = useSignal(0);
 	const uiMessages = useSignal<UIMessage[]>([]);
-	const session = useSignal<SessionManager>(initialSession);
+	const session = useSignal<SessionHandle>(initialSession);
 	const abortController = useSignal<AbortController | null>(null);
 	const escPrimed = useSignal(false);
 
@@ -387,7 +389,7 @@ function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: S
 			if (isLoading.value) return;
 			session.value.flush();
 			currentSession = null;
-			SessionManager.open(item.id).then((sm) => {
+			sessionStore.open(item.id).then((sm) => {
 				session.value = sm;
 				currentSession = sm;
 				uiMessages.value = entriesToUIMessages(sm.getEntries());
@@ -433,11 +435,11 @@ function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: S
 				tokenCount.value = 0;
 				totalCost.value = 0;
 				sessionId.value++;
-				const newSm = SessionManager.create(Deno.cwd());
+				const newSm = sessionStore.create(Deno.cwd());
 				session.value = newSm;
 				currentSession = newSm;
 			} else if (item.id === "threads") {
-				SessionManager.listSummaries(Deno.cwd()).then((summaries) => {
+				sessionStore.listSummaries(Deno.cwd()).then((summaries) => {
 					threadItems.value = summaries.map((s) => {
 						const date = new Date(s.timestamp);
 						const label = date.toLocaleString();
@@ -541,7 +543,7 @@ function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: S
 // Quit handler — flush the current session before exiting
 // ---------------------------------------------------------------------------
 
-let currentSession: SessionManager | null = null;
+let currentSession: SessionHandle | null = null;
 
 async function beforeQuit() {
 	if (currentSession) {
@@ -554,6 +556,6 @@ async function beforeQuit() {
 // Entry
 // ---------------------------------------------------------------------------
 
-const initialSession = SessionManager.create(Deno.cwd());
+const initialSession = sessionStore.create(Deno.cwd());
 currentSession = initialSession;
 run((quit) => <App onQuit={quit} initialSession={initialSession} />, beforeQuit);
