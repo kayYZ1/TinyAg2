@@ -1,10 +1,21 @@
 # Relay v0.8.0
 
-A terminal-based coding agent with a custom TUI framework, built with Deno and TypeScript.
+A coding agent with a custom terminal UI framework, built with Deno and TypeScript.
 
 Relay is a monorepo (Deno workspace) containing a terminal UI framework powered by a custom JSX runtime and Yoga flexbox
 layout, an OpenAI-compatible LLM API layer with streaming support, and an agentic loop with built-in tools — all wired
 together into an interactive coding assistant that runs entirely in your terminal.
+
+> **Note — Project Transition**
+>
+> Relay is evolving from a local, terminal-only coding agent into a more advanced agent designed to run on both the
+> terminal and the web, sharing the same sessions between clients. Conversations are now persisted in a shared Turso
+> database instead of local JSONL files, keyed by a stable owner ID and workspace, so a session started in one client
+> can be continued in the other.
+>
+> **No new release will be published for this work yet.** The latest GitHub Release (`v0.8.0`) predates all web
+> extension related changes and still reflects the old local-only agent with filesystem session storage. To use the new
+> shared-session behavior, build from source as described below.
 
 ## Features
 
@@ -15,11 +26,17 @@ together into an interactive coding assistant that runs entirely in your termina
 - **Streaming agent loop** — Async generator that yields events for real-time UI updates as the LLM thinks and uses
   tools
 - **Built-in tools** — Bash, file read/write/edit, and grep for filesystem interaction
+- **Shared session storage** — Conversations persist in a Turso database so terminal and web clients share the same
+  session history
 - **Inline diffs** — File write and edit operations display colored unified diffs with line numbers
 - **Markdown rendering** — Inline markdown display in the terminal with syntax highlighting
 - **Command palette** — Fuzzy-searchable command menu
 
 ## Install
+
+> The published binary (`v0.8.0`) is the local-only agent from before the web extension changes. Session persistence in
+> that binary uses local JSONL files, not the shared database. Until a new release is published, build from source to
+> get the current behavior.
 
 Download the latest Linux binary from [GitHub Releases](https://github.com/kayYZ1/relay/releases/latest):
 
@@ -27,6 +44,14 @@ Download the latest Linux binary from [GitHub Releases](https://github.com/kayYZ
 curl -L https://github.com/kayYZ1/relay/releases/latest/download/relay -o relay
 chmod +x relay
 sudo mv relay /usr/local/bin/
+```
+
+Or build the current version from source (see [Development](#development)):
+
+```bash
+git clone https://github.com/kayYZ1/relay.git
+cd relay
+deno task build        # outputs dist/relay
 ```
 
 On first run, Relay will prompt you for an API key and save it to `~/.relay/auth.json`.
@@ -112,15 +137,15 @@ The agent loop is an async generator (`run()`) that streams `AgentEvent`s:
 | `edit_file`     | Edit         | Edit files with diff output      |
 | `grep`          | Grep         | Search files with regex patterns |
 
-**Session persistence** — Conversations are stored in the shared database and can be shared by the terminal and web
-clients. The terminal requires `TURSO_DB_URL`, `TURSO_DB_TOKEN`, and a shared `RELAY_OWNER_ID`:
+**Session persistence** — Conversations are stored in the shared Turso database and can be shared by the terminal and
+web clients. The terminal requires `TURSO_DB_URL`, `TURSO_DB_TOKEN`, and a shared `RELAY_OWNER_ID`:
 
 - **Create** — New sessions with unique IDs and timestamps
 - **Continue** — Resume the most recent session for a workspace
 - **Open** — Load a specific session by opaque session ID
 - **List** — Browse all sessions with summaries (first user message preview)
-- **Cleanup** — Automatic retention of the 7 most recent sessions
-- **Token tracking** — Per-session token counts persisted in headers
+- **Cross-client** — A session started in the terminal can be continued on the web, and vice versa
+- **Token tracking** — Per-session token and cost counts persisted in session metadata
 
 Sessions store metadata plus ordered entries: user/assistant messages and tool results. The workspace path is part of
 the session scope, so sessions from different projects remain separate.
@@ -196,6 +221,9 @@ deno task playground:welcome          # Welcome screen
 ```
 
 ## Releasing
+
+> **Current status:** no new release is planned while the web extension work is in progress. `v0.8.0` remains the latest
+> published release and predates the shared database session changes. The steps below apply once releases resume.
 
 Tag-based releases via GitHub Actions (`.github/workflows/release.yml`):
 
