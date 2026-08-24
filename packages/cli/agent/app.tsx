@@ -1,10 +1,11 @@
 import { runAgentLoop } from "@vvtxn/relay/core/runner.ts";
 import type { ToolResult } from "@vvtxn/relay/core/tools/types.ts";
-import { createUIToolCall } from "@vvtxn/relay/core/display.ts";
+import { createUIToolCall, getToolDisplayName, summarizeToolArgs } from "@vvtxn/relay/core/display.ts";
 import type { UIToolCall } from "@vvtxn/relay/core/display.ts";
 import type { Message, Usage } from "@vvtxn/relay/api/types.ts";
 import { CompletionsProvider } from "@vvtxn/relay/api/providers/completions.ts";
-import { createToolRegistry, defaultTools } from "@vvtxn/relay/core/tools/index.ts";
+import { createToolRegistry, createWorkspaceTools } from "@vvtxn/relay/core/tools/index.ts";
+import { type ApprovalHandler, withApproval } from "@vvtxn/relay/core/tools/approval.ts";
 import { expandMentions, getGitBranch } from "@vvtxn/relay/core/workspace.ts";
 import {
 	entriesToMessages,
@@ -13,8 +14,18 @@ import {
 	stripAttachedContext,
 } from "@vvtxn/relay/core/sessions/index.ts";
 import { run } from "@/tui/render/index.ts";
-import { Box, CommandPalette, ScrollArea, Spinner, Text, TextInput, WelcomeScreen } from "@/tui/render/components.tsx";
+import {
+	ApprovalPrompt,
+	Box,
+	CommandPalette,
+	ScrollArea,
+	Spinner,
+	Text,
+	TextInput,
+	WelcomeScreen,
+} from "@/tui/render/components.tsx";
 import { getHookKey, hasCleanup, setCleanup, useSignal } from "@/tui/render/hooks/signals.ts";
+import { type ApprovalDecision, useApprovalPrompt } from "@/tui/render/hooks/approval.ts";
 import { useTextInput, type VimMode } from "@/tui/render/hooks/text-input.ts";
 import { type CommandPaletteItem, useCommandPalette } from "@/tui/render/hooks/command-palette.ts";
 import { inputManager } from "@/tui/core/input.ts";
@@ -34,7 +45,9 @@ const apiKey = await loadApiKey();
 const branchName = await getGitBranch(Deno.cwd()) ?? "";
 
 const provider = new CompletionsProvider({ apiKey, baseURL: config.baseURL });
-const tools = createToolRegistry(defaultTools);
+const workspaceTools = createWorkspaceTools(Deno.cwd());
+/** Tools the user chose to always allow (process-lifetime memory). */
+const alwaysApprovedTools = new Set<string>();
 
 // ---------------------------------------------------------------------------
 // UI Types
@@ -113,6 +126,9 @@ function entriesToUIMessages(entries: Entry[]): UIMessage[] {
 }
 
 function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: SessionManager }) {
+	// Registered first so a pending approval consumes keys (Esc denies) before
+	// the double-Esc cancel handler below sees them.
+	const approval = useApprovalPrompt();
 	const input = useSignal("");
 	const cursor = useSignal(0);
 	const mode = useSignal<VimMode>("INSERT");
@@ -187,6 +203,33 @@ function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: S
 					break;
 				}
 			}
+
+			const approvalHandler: ApprovalHandler = async (tool, toolInput) => {
+				const name = tool.definition.function.name;
+				if (alwaysApprovedTools.has(name)) return true;
+				if (ac.signal.aborted) return false;
+
+				const decision = await Promise.race([
+					approval.ask({
+						toolName: getToolDisplayName(name),
+						summary: summarizeToolArgs(name, JSON.stringify(toolInput)),
+					}),
+					// Deny the prompt if the run is aborted while waiting for an answer
+					new Promise<ApprovalDecision>((resolve) => {
+						ac.signal.addEventListener("abort", () => {
+							approval.cancel();
+							resolve("deny");
+						}, { once: true });
+					}),
+				]);
+
+				if (decision === "always") {
+					alwaysApprovedTools.add(name);
+					return true;
+				}
+				return decision === "allow";
+			};
+			const tools = createToolRegistry(withApproval(workspaceTools, approvalHandler));
 
 			const draft = { text: "", toolCalls: [] as UIToolCall[], msgIndex: -1 };
 			const toolCallIndex = new Map<string, number>();
@@ -489,6 +532,7 @@ function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: S
 			<CommandPalette palette={palette} />
 			<CommandPalette palette={filePalette} placeholder="Search files..." borderLabel="Files" />
 			<CommandPalette palette={threadsPalette} placeholder="Search threads..." borderLabel="Threads" width={80} />
+			<ApprovalPrompt approval={approval} />
 		</Box>
 	);
 }

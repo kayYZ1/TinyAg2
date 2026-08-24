@@ -17,8 +17,9 @@ export type { DiffLine, UIToolCall } from "./display.ts";
 export { estimateMessageTokens, estimateTokens, trimContext } from "./context.ts";
 export type { TrimOptions } from "./context.ts";
 
-export { createToolRegistry, defaultTools, defineTool, getDefinitions } from "./tools/index.ts";
+export { createToolRegistry, createWorkspaceTools, defaultTools, defineTool, getDefinitions } from "./tools/index.ts";
 export type { Tool, ToolRegistry, ToolResult } from "./tools/index.ts";
+export { type ApprovalHandler, type ApprovalOptions, withApproval } from "./tools/approval.ts";
 
 export { entriesToMessages, SessionManager, stripAttachedContext } from "./sessions/index.ts";
 export { sessionDir, sessionsBaseDir } from "./sessions/index.ts";

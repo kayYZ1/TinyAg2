@@ -7,6 +7,7 @@
 		"lint": "deno lint",
 		"test": "deno test --unstable-raw-imports --allow-read --allow-write --allow-env --allow-run",
 		"agent": "deno run --unstable-raw-imports --allow-all packages/cli/agent/index.ts",
+		"playground:approval": "deno run --allow-all packages/cli/tui/playground/approval.tsx",
 		"playground:command-palette": "deno run --allow-all packages/cli/tui/playground/command-palette.tsx",
 		"playground:layout": "deno run --allow-all packages/cli/tui/playground/layout.tsx",
 		"playground:markdown": "deno run --allow-all packages/cli/tui/playground/markdown.tsx",

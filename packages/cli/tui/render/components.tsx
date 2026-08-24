@@ -86,6 +86,7 @@ export function ScrollArea(props: ScrollAreaProps & { autoScroll?: boolean }) {
 
 export { CommandPalette } from "./components/command-palette.tsx";
 export { WelcomeScreen } from "./components/welcome-screen.tsx";
+export { ApprovalPrompt } from "./components/approval-prompt.tsx";
 
 export function Markdown(props: MarkdownProps) {
 	const content = childrenToString(props.children);
