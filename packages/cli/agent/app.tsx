@@ -15,6 +15,7 @@ import {
 	type SessionScope,
 	stripAttachedContext,
 } from "@vvtxn/relay/core/sessions/index.ts";
+import { authenticate, DatabaseUserStore, LocalAuthProvider } from "@vvtxn/relay/core/index.ts";
 import { run } from "@/tui/render/index.ts";
 import {
 	ApprovalPrompt,
@@ -48,10 +49,13 @@ const branchName = await getGitBranch(Deno.cwd()) ?? "";
 
 const provider = new CompletionsProvider({ apiKey, baseURL: config.baseURL });
 const sessionStore = DatabaseSessionStore.fromEnv();
+const user = await authenticate(
+	LocalAuthProvider.fromEnv(),
+	undefined,
+	DatabaseUserStore.fromEnv(),
+);
 const sessionScope: SessionScope = {
-	ownerId: Deno.env.get("RELAY_OWNER_ID") ?? (() => {
-		throw new Error("RELAY_OWNER_ID is required");
-	})(),
+	ownerId: user.id,
 	cwd: Deno.cwd(),
 };
 const workspaceTools = createWorkspaceTools(Deno.cwd());

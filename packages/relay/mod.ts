@@ -105,6 +105,10 @@ export type {
 	ToolResultEntry,
 } from "./core/sessions/index.ts";
 
+// Authentication
+export { authenticate, DatabaseUserStore, GitHubAuthProvider, LocalAuthProvider } from "./core/index.ts";
+export type { AuthenticatedUser, AuthIdentity, AuthProvider, GitHubProfile, UserStore } from "./core/index.ts";
+
 // Paths
 export { homeDir, relayDir } from "./core/paths.ts";
 
