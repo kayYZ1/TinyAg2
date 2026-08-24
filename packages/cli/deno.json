@@ -1,6 +1,6 @@
 {
 	"name": "@vvtxn/cli",
-	"version": "0.7.3",
+	"version": "0.8.0",
 	"exports": {
 		".": "./agent/index.ts"
 	},

@@ -28,10 +28,7 @@ async function run(args: string[]) {
 async function build() {
 	const hash = await getGitHash();
 	const fullVersion = `${VERSION}+${hash}`;
-
-	console.log(`Building relay v${fullVersion}`);
-
-	await run([
+	const compileArgs = [
 		"deno",
 		"compile",
 		"--unstable-raw-imports",
@@ -43,7 +40,18 @@ async function build() {
 		"--output",
 		"dist/relay",
 		"packages/cli/agent/index.ts",
-	]);
+	];
+
+	try {
+		await Deno.stat(".env");
+		compileArgs.splice(2, 0, "--env-file=.env");
+	} catch {
+		// Release builds intentionally use runtime environment variables.
+	}
+
+	console.log(`Building relay v${fullVersion}`);
+
+	await run(compileArgs);
 
 	const stat = await Deno.stat("dist/relay");
 	const sizeMB = (stat.size / (1024 * 1024)).toFixed(1);

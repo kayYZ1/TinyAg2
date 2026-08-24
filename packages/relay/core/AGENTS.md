@@ -140,11 +140,11 @@ needs no changes and the model can react. Handlers waiting on user input should 
 
 ### Session Management
 
-`sessions/manager.ts` provides persistent conversation storage:
+`sessions/` provides storage-neutral conversation contracts and adapters:
 
-- Sessions stored as JSONL in `~/.relay/sessions/`
-- CRUD operations: create, list, load, save, delete
-- Each session contains message history and metadata
+- `DatabaseSessionStore` stores shared sessions and ordered messages in the database
+- `FileSessionStore` preserves the JSONL implementation for local tests and fallback tooling
+- Session ownership and workspace are explicit in `SessionScope`
 
 ### Workspace Helpers (`workspace.ts`)
 

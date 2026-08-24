@@ -1,10 +1,11 @@
 {
 	"name": "@vvtxn/relay",
-	"version": "0.7.3",
+	"version": "0.8.0",
 	"exports": {
 		".": "./mod.ts"
 	},
 	"imports": {
-		"@/": "./"
+		"@/": "./",
+		"@tursodatabase/serverless/compat": "npm:@tursodatabase/serverless@^1.4.0/compat"
 	}
 }

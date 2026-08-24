@@ -8,9 +8,11 @@ import { createToolRegistry, createWorkspaceTools } from "@vvtxn/relay/core/tool
 import { type ApprovalHandler, withApproval } from "@vvtxn/relay/core/tools/approval.ts";
 import { expandMentions, getGitBranch } from "@vvtxn/relay/core/workspace.ts";
 import {
+	DatabaseSessionStore,
 	entriesToMessages,
 	type Entry,
-	SessionManager,
+	type SessionHandle,
+	type SessionScope,
 	stripAttachedContext,
 } from "@vvtxn/relay/core/sessions/index.ts";
 import { run } from "@/tui/render/index.ts";
@@ -45,6 +47,13 @@ const apiKey = await loadApiKey();
 const branchName = await getGitBranch(Deno.cwd()) ?? "";
 
 const provider = new CompletionsProvider({ apiKey, baseURL: config.baseURL });
+const sessionStore = DatabaseSessionStore.fromEnv();
+const sessionScope: SessionScope = {
+	ownerId: Deno.env.get("RELAY_OWNER_ID") ?? (() => {
+		throw new Error("RELAY_OWNER_ID is required");
+	})(),
+	cwd: Deno.cwd(),
+};
 const workspaceTools = createWorkspaceTools(Deno.cwd());
 /** Tools the user chose to always allow (process-lifetime memory). */
 const alwaysApprovedTools = new Set<string>();
@@ -101,7 +110,7 @@ function entriesToUIMessages(entries: Entry[]): UIMessage[] {
 
 	for (const entry of entries) {
 		if (entry.type === "message" && entry.role === "user" && typeof entry.content === "string") {
-			const displayContent = entry.content.replace(/\n\n<attached_context>[\s\S]*<\/attached_context>$/, "");
+			const displayContent = stripAttachedContext(entry.content);
 			messages.push({ role: "user", content: displayContent });
 		} else if (entry.type === "message" && entry.role === "assistant") {
 			const hasContent = typeof entry.content === "string" && entry.content.trim();
@@ -125,7 +134,7 @@ function entriesToUIMessages(entries: Entry[]): UIMessage[] {
 	return messages;
 }
 
-function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: SessionManager }) {
+function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: SessionHandle }) {
 	// Registered first so a pending approval consumes keys (Esc denies) before
 	// the double-Esc cancel handler below sees them.
 	const approval = useApprovalPrompt();
@@ -138,7 +147,8 @@ function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: S
 	const totalCost = useSignal(0);
 	const sessionId = useSignal(0);
 	const uiMessages = useSignal<UIMessage[]>([]);
-	const session = useSignal<SessionManager>(initialSession);
+	const session = useSignal<SessionHandle>(initialSession);
+	const generationCosts = useSignal(new Map<string, number>());
 	const abortController = useSignal<AbortController | null>(null);
 	const escPrimed = useSignal(false);
 
@@ -298,27 +308,30 @@ function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: S
 					syncDraft(true);
 				},
 				onMessageComplete(usage?: Usage, generationId?: string) {
+					const fallbackCost = usage?.cost ?? 0;
 					if (usage) {
 						tokenCount.value = usage.prompt_tokens + usage.completion_tokens;
-						if (usage.cost) {
-							totalCost.value += usage.cost;
+						if (fallbackCost) {
+							totalCost.value += fallbackCost;
 							session.value.setCost(totalCost.value);
 						}
 						session.value.setTokens(tokenCount.value);
 					}
 					if (generationId) {
+						generationCosts.value.set(generationId, fallbackCost);
 						const sid = sessionId.value;
 						provider.getGenerationStats(generationId).then((stats) => {
 							if (!stats || sessionId.value !== sid) return;
 							if (stats.totalCost !== null) {
-								totalCost.value += stats.totalCost;
+								totalCost.value += stats.totalCost - (generationCosts.value.get(generationId) ?? 0);
+								generationCosts.value.delete(generationId);
 								session.value.setCost(totalCost.value);
 							}
 							if (!usage && stats.promptTokens !== null && stats.completionTokens !== null) {
 								tokenCount.value = stats.promptTokens + stats.completionTokens;
 								session.value.setTokens(tokenCount.value);
 							}
-						});
+						}).catch(() => {});
 					}
 					status.value = { kind: "thinking" };
 				},
@@ -385,15 +398,17 @@ function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: S
 		maxResults: 20,
 		onSelect: (item) => {
 			if (isLoading.value) return;
-			session.value.flush();
-			currentSession = null;
-			SessionManager.open(item.id).then((sm) => {
+			void (async () => {
+				await session.value.flush();
+				const sm = await sessionStore.open(item.id, sessionScope.ownerId);
 				session.value = sm;
 				currentSession = sm;
 				uiMessages.value = entriesToUIMessages(sm.getEntries());
 				tokenCount.value = sm.getTokens();
 				totalCost.value = sm.getCost();
 				sessionId.value++;
+			})().catch((error) => {
+				uiMessages.value = [...uiMessages.value, { role: "agent", content: `**Session error:** ${error}` }];
 			});
 		},
 	});
@@ -427,17 +442,20 @@ function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: S
 		mode,
 		onSelect: (item) => {
 			if (item.id === "new-chat") {
-				session.value.flush();
-				currentSession = null;
-				uiMessages.value = [];
-				tokenCount.value = 0;
-				totalCost.value = 0;
-				sessionId.value++;
-				const newSm = SessionManager.create(Deno.cwd());
-				session.value = newSm;
-				currentSession = newSm;
+				void (async () => {
+					await session.value.flush();
+					uiMessages.value = [];
+					tokenCount.value = 0;
+					totalCost.value = 0;
+					sessionId.value++;
+					const newSm = sessionStore.create(sessionScope);
+					session.value = newSm;
+					currentSession = newSm;
+				})().catch((error) => {
+					uiMessages.value = [...uiMessages.value, { role: "agent", content: `**Session error:** ${error}` }];
+				});
 			} else if (item.id === "threads") {
-				SessionManager.listSummaries(Deno.cwd()).then((summaries) => {
+				void sessionStore.listSummaries(sessionScope).then((summaries) => {
 					threadItems.value = summaries.map((s) => {
 						const date = new Date(s.timestamp);
 						const label = date.toLocaleString();
@@ -446,14 +464,16 @@ function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: S
 								? s.firstUserMessage.slice(0, 45) + "…"
 								: s.firstUserMessage
 							: "(empty session)";
-						return { id: s.path, title: preview, description: label, keywords: [s.id] };
+						return { id: s.reference, title: preview, description: label, keywords: [s.id] };
 					});
 					threadsPalette.openPalette();
+				}).catch((error) => {
+					uiMessages.value = [...uiMessages.value, { role: "agent", content: `**Session error:** ${error}` }];
 				});
 			} else if (item.id === "quit") {
-				session.value.flush();
-				currentSession = null;
-				onQuit();
+				void session.value.flush().then(onQuit).catch((error) => {
+					uiMessages.value = [...uiMessages.value, { role: "agent", content: `**Session error:** ${error}` }];
+				});
 			}
 		},
 	});
@@ -541,7 +561,7 @@ function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: S
 // Quit handler — flush the current session before exiting
 // ---------------------------------------------------------------------------
 
-let currentSession: SessionManager | null = null;
+let currentSession: SessionHandle | null = null;
 
 async function beforeQuit() {
 	if (currentSession) {
@@ -554,6 +574,6 @@ async function beforeQuit() {
 // Entry
 // ---------------------------------------------------------------------------
 
-const initialSession = SessionManager.create(Deno.cwd());
+const initialSession = sessionStore.create(sessionScope);
 currentSession = initialSession;
 run((quit) => <App onQuit={quit} initialSession={initialSession} />, beforeQuit);

@@ -1,4 +1,5 @@
 import { join } from "@std/path/join";
+import { dirname } from "@std/path/dirname";
 import type { Message } from "@/api/types.ts";
 import { sessionDir, sessionFilePath } from "./paths.ts";
 import {
@@ -74,6 +75,7 @@ export class SessionManager {
 	private path: string | null;
 	private needsFlush: boolean;
 	private headerDirty = false;
+	private appendQueue = Promise.resolve();
 
 	private constructor(session: Session, path: string | null, needsFlush = false) {
 		this.session = session;
@@ -82,9 +84,9 @@ export class SessionManager {
 	}
 
 	/** Start a new persistent session. File is created lazily on first append. */
-	static create(cwd: string): SessionManager {
+	static create(cwd: string, ownerId?: string): SessionManager {
 		const id = newId();
-		const path = sessionFilePath(cwd, id);
+		const path = sessionFilePath(cwd, id, ownerId);
 
 		const header: SessionHeader = {
 			type: "session",
@@ -94,13 +96,13 @@ export class SessionManager {
 			cwd,
 		};
 
-		SessionManager.cleanup(cwd).catch(() => {});
+		SessionManager.cleanup(cwd, 10, ownerId).catch(() => {});
 		return new SessionManager({ header, entries: [] }, path, true);
 	}
 
 	/** Load and continue the most recent session for this cwd. */
-	static async continueRecent(cwd: string): Promise<SessionManager | null> {
-		const files = await SessionManager.list(cwd);
+	static async continueRecent(cwd: string, ownerId?: string): Promise<SessionManager | null> {
+		const files = await SessionManager.list(cwd, ownerId);
 		if (files.length === 0) return null;
 		return SessionManager.open(files[0]);
 	}
@@ -112,8 +114,8 @@ export class SessionManager {
 	}
 
 	/** List all session files for this cwd, most recently active first. */
-	static async list(cwd: string): Promise<string[]> {
-		const dir = sessionDir(cwd);
+	static async list(cwd: string, ownerId?: string): Promise<string[]> {
+		const dir = sessionDir(cwd, ownerId);
 		const files: { path: string; mtime: number }[] = [];
 
 		try {
@@ -136,16 +138,16 @@ export class SessionManager {
 	}
 
 	/** Delete old sessions beyond the `keep` most recent. Returns count deleted. */
-	static async cleanup(cwd: string, keep = 10): Promise<number> {
-		const files = await SessionManager.list(cwd);
+	static async cleanup(cwd: string, keep = 10, ownerId?: string): Promise<number> {
+		const files = await SessionManager.list(cwd, ownerId);
 		const toDelete = files.slice(keep);
 		await Promise.all(toDelete.map((f) => Deno.remove(f)));
 		return toDelete.length;
 	}
 
 	/** List session summaries (id, timestamp, first user message) for this cwd. */
-	static async listSummaries(cwd: string): Promise<SessionSummary[]> {
-		const files = await SessionManager.list(cwd);
+	static async listSummaries(cwd: string, ownerId?: string): Promise<SessionSummary[]> {
+		const files = await SessionManager.list(cwd, ownerId);
 		const summaries: SessionSummary[] = [];
 
 		for (const filePath of files) {
@@ -180,7 +182,7 @@ export class SessionManager {
 					}
 				}
 
-				summaries.push({ id: header.id, path: filePath, timestamp: header.timestamp, firstUserMessage });
+				summaries.push({ id: header.id, reference: filePath, timestamp: header.timestamp, firstUserMessage });
 			} catch {
 				// Skip corrupt files
 			}
@@ -235,27 +237,29 @@ export class SessionManager {
 
 	/** Append a new entry to the session. Creates the file on first call. */
 	async append(entry: NewEntry): Promise<string> {
-		const id = newId();
-		const full = { ...entry, id, timestamp: new Date().toISOString() } as Entry;
-
-		if (this.path) {
-			if (this.needsFlush) {
-				await Deno.mkdir(sessionDir(this.session.header.cwd), { recursive: true });
-				await Deno.writeTextFile(this.path, JSON.stringify(this.session.header) + "\n");
-				this.needsFlush = false;
-				this.headerDirty = false;
-			} else if (this.headerDirty) {
-				await this.flushHeader();
+		let id = "";
+		const operation = this.appendQueue.then(async () => {
+			id = newId();
+			const full = { ...entry, id, timestamp: new Date().toISOString() } as Entry;
+			if (this.path) {
+				if (this.needsFlush) {
+					await Deno.mkdir(dirname(this.path), { recursive: true });
+					await Deno.writeTextFile(this.path, JSON.stringify(this.session.header) + "\n");
+					this.needsFlush = false;
+					this.headerDirty = false;
+				} else if (this.headerDirty) await this.flushHeader();
+				await Deno.writeTextFile(this.path, JSON.stringify(full) + "\n", { append: true });
 			}
-			await Deno.writeTextFile(this.path, JSON.stringify(full) + "\n", { append: true });
-		}
-
-		this.session.entries.push(full);
+			this.session.entries.push(full);
+		});
+		this.appendQueue = operation.catch(() => {});
+		await operation;
 		return id;
 	}
 
 	/** Flush the header to disk. Call on session switch, quit, or idle. */
 	async flush(): Promise<void> {
+		await this.appendQueue;
 		await this.flushHeader();
 	}
 }

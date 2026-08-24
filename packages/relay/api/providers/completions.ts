@@ -54,11 +54,16 @@ export class CompletionsProvider implements LLMProvider {
 
 	/** Fetch generation stats from OpenRouter's generation endpoint. Returns null for non-OpenRouter providers. */
 	async getGenerationStats(id: string): Promise<GenerationStats | null> {
+		let timer: ReturnType<typeof setTimeout>;
+		const timeout = new Promise<never>((_, reject) => {
+			timer = setTimeout(() => reject(new Error("Generation stats request timed out")), FETCH_TIMEOUT_MS);
+		});
 		try {
 			const url = `${this.baseURL}/generation?id=${encodeURIComponent(id)}`;
-			const response = await fetch(url, {
-				headers: { "Authorization": `Bearer ${this.apiKey}` },
-			});
+			const response = await Promise.race([
+				fetch(url, { headers: { "Authorization": `Bearer ${this.apiKey}` } }),
+				timeout,
+			]);
 			if (!response.ok) return null;
 			const json = await response.json();
 			const data = json?.data;
@@ -70,6 +75,8 @@ export class CompletionsProvider implements LLMProvider {
 			};
 		} catch {
 			return null;
+		} finally {
+			clearTimeout(timer!);
 		}
 	}
 

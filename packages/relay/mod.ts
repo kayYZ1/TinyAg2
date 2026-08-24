@@ -89,13 +89,18 @@ export type { Tool, ToolRegistry, ToolResult } from "./core/tools/index.ts";
 export { type ApprovalHandler, type ApprovalOptions, withApproval } from "./core/tools/approval.ts";
 
 // Sessions
-export { entriesToMessages, SessionManager, stripAttachedContext } from "./core/sessions/index.ts";
+export { entriesToMessages, FileSessionStore, SessionManager, stripAttachedContext } from "./core/sessions/index.ts";
+export { DatabaseSessionStore } from "./core/sessions/index.ts";
 export { sessionDir, sessionsBaseDir } from "./core/sessions/index.ts";
 export type {
 	Entry,
 	MessageEntry,
+	NewEntry,
 	Session,
+	SessionHandle,
 	SessionHeader,
+	SessionScope,
+	SessionStore,
 	SessionSummary,
 	ToolResultEntry,
 } from "./core/sessions/index.ts";
