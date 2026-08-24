@@ -191,3 +191,54 @@ Deno.test("required callbacks still work without optional streaming callbacks", 
 	assertEquals(endName, "echo");
 	assertEquals(endArgs, '{"text":"hi"}');
 });
+
+Deno.test("routes callback failures to onError without abandoning the stream", async () => {
+	const provider = mockProvider([[textChunk("one"), textChunk("two"), finishChunk()]]);
+	const errors: string[] = [];
+	const text: string[] = [];
+
+	await runAgentLoop(
+		[{ role: "user", content: "hello" }],
+		{ provider, tools: new Map(), model: "test", systemPrompt: "You are helpful." },
+		{
+			onTextDelta(delta) {
+				text.push(delta);
+				if (delta === "one") throw new Error("display failed");
+			},
+			onToolCallEnd() {},
+			onToolResult() {},
+			onMessageComplete() {},
+			onTurnComplete() {},
+			onError(error) {
+				errors.push(error.message);
+			},
+		},
+	);
+
+	assertEquals(text, ["one", "two"]);
+	assertEquals(errors, ["display failed"]);
+});
+
+Deno.test("stops dispatching events after the abort signal fires", async () => {
+	const provider = mockProvider([[textChunk("one"), textChunk("two"), finishChunk()]]);
+	const controller = new AbortController();
+	const text: string[] = [];
+
+	await runAgentLoop(
+		[{ role: "user", content: "hello" }],
+		{ provider, tools: new Map(), model: "test", systemPrompt: "You are helpful.", signal: controller.signal },
+		{
+			onTextDelta(delta) {
+				text.push(delta);
+				controller.abort();
+			},
+			onToolCallEnd() {},
+			onToolResult() {},
+			onMessageComplete() {},
+			onTurnComplete() {},
+			onError() {},
+		},
+	);
+
+	assertEquals(text, ["one"]);
+});

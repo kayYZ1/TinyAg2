@@ -83,6 +83,49 @@ Deno.test("expandMentions leaves mentions escaping the root as-is", async () => 
 	}
 });
 
+Deno.test("expandMentions rejects symlinks that resolve outside the root", async () => {
+	const parent = await Deno.makeTempDir();
+	try {
+		const root = `${parent}/project`;
+		await Deno.mkdir(root);
+		await Deno.writeTextFile(`${parent}/secret.txt`, "top secret");
+		await Deno.mkdir(`${parent}/outside`);
+		await Deno.writeTextFile(`${parent}/outside/secret.txt`, "directory secret");
+		await Deno.symlink(`${parent}/secret.txt`, `${root}/file-link.txt`);
+		await Deno.symlink(`${parent}/outside`, `${root}/dir-link`);
+
+		const result = await expandMentions("read @file-link.txt and @dir-link", root);
+
+		assertEquals(result, "read @file-link.txt and @dir-link");
+	} finally {
+		await Deno.remove(parent, { recursive: true });
+	}
+});
+
+Deno.test("expandMentions normalizes duplicate mentions and truncates large files", async () => {
+	const dir = await Deno.makeTempDir();
+	try {
+		await Deno.mkdir(`${dir}/src`);
+		await Deno.writeTextFile(`${dir}/src/a.ts`, "a".repeat(10_001));
+
+		const result = await expandMentions("check @src @src/", dir);
+
+		assertEquals(result.match(/--- src\/a\.ts ---/g)?.length, 1);
+		assert(result.includes("...(truncated)"));
+	} finally {
+		await Deno.remove(dir, { recursive: true });
+	}
+});
+
+Deno.test("expandMentions does not treat email addresses as mentions", async () => {
+	const dir = await Deno.makeTempDir();
+	try {
+		assertEquals(await expandMentions("email user@example.com", dir), "email user@example.com");
+	} finally {
+		await Deno.remove(dir, { recursive: true });
+	}
+});
+
 // ---------------------------------------------------------------------------
 // listProjectFiles / isGitRepo / getGitBranch
 // ---------------------------------------------------------------------------

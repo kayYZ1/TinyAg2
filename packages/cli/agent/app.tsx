@@ -171,152 +171,164 @@ function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: S
 	};
 
 	const runSubmission = async (value: string, ac: AbortController) => {
-		// Resolve @mentions: read file/directory contents and append as context
-		const expandedValue = await expandMentions(value, Deno.cwd());
-
-		// Store stripped version in session (without file content bloat in history)
-		await session.value.append({ type: "message", role: "user", content: stripAttachedContext(expandedValue) });
-		const messages = entriesToMessages(session.value.getEntries());
-
-		// Replace the last user message with the full expanded content for the LLM
-		for (let i = messages.length - 1; i >= 0; i--) {
-			if (messages[i].role === "user") {
-				messages[i] = { ...messages[i], content: expandedValue };
-				break;
-			}
-		}
-
-		const draft = { text: "", toolCalls: [] as UIToolCall[], msgIndex: -1 };
-		const toolCallIndex = new Map<string, number>();
-
 		let syncTimer: ReturnType<typeof setTimeout> | null = null;
-		let syncPending = false;
+		try {
+			// Resolve @mentions: read file/directory contents and append as context
+			const expandedValue = await expandMentions(value, Deno.cwd());
 
-		const doSync = () => {
-			const msgs = [...uiMessages.value];
-			const entry: UIMessage = { role: "agent", content: draft.text, toolCalls: [...draft.toolCalls] };
-			if (draft.msgIndex >= 0 && draft.msgIndex < msgs.length) {
-				msgs[draft.msgIndex] = entry;
-			} else {
-				draft.msgIndex = msgs.length;
-				msgs.push(entry);
-			}
-			uiMessages.value = msgs;
-			syncPending = false;
-		};
+			// Store stripped version in session (without file content bloat in history)
+			await session.value.append({ type: "message", role: "user", content: stripAttachedContext(expandedValue) });
+			const messages = entriesToMessages(session.value.getEntries());
 
-		const syncDraft = (force = false) => {
-			if (force) {
-				if (syncTimer) clearTimeout(syncTimer);
-				syncTimer = null;
-				doSync();
-				return;
-			}
-			if (syncPending) return;
-			syncPending = true;
-			syncTimer = setTimeout(() => {
-				syncTimer = null;
-				doSync();
-			}, 50);
-		};
-
-		await runAgentLoop(messages, {
-			provider,
-			tools,
-			model: config.model,
-			systemPrompt: SYSTEM_PROMPT,
-			temperature: config.temperature,
-			contextLimit: { maxTokens: config.maxTokens, preserveRecentTurns: config.preserveRecentTurns },
-			maxTokens: config.maxCompletionTokens,
-			signal: ac.signal,
-		}, {
-			onTextDelta(delta: string) {
-				status.value = { kind: "writing" };
-				draft.text += delta;
-				syncDraft();
-			},
-			onToolCallEnd(id: string, name: string, args: string) {
-				status.value = { kind: "running_tool", toolName: name };
-				const idx = draft.toolCalls.length;
-				toolCallIndex.set(id, idx);
-				draft.toolCalls.push(createUIToolCall(name, args));
-				syncDraft(true);
-			},
-			onToolResult(id: string, result: ToolResult) {
-				const idx = toolCallIndex.get(id);
-				if (idx !== undefined && idx < draft.toolCalls.length) {
-					draft.toolCalls[idx] = {
-						...draft.toolCalls[idx],
-						output: result.content,
-						diff: result.meta?.diff,
-					};
+			// Replace the last user message with the full expanded content for the LLM
+			for (let i = messages.length - 1; i >= 0; i--) {
+				if (messages[i].role === "user") {
+					messages[i] = { ...messages[i], content: expandedValue };
+					break;
 				}
-				syncDraft(true);
-			},
-			onMessageComplete(usage?: Usage, generationId?: string) {
-				if (usage) {
-					tokenCount.value = usage.prompt_tokens + usage.completion_tokens;
-					if (usage.cost) {
-						totalCost.value += usage.cost;
-						session.value.setCost(totalCost.value);
+			}
+
+			const draft = { text: "", toolCalls: [] as UIToolCall[], msgIndex: -1 };
+			const toolCallIndex = new Map<string, number>();
+
+			let syncPending = false;
+
+			const doSync = () => {
+				const msgs = [...uiMessages.value];
+				const entry: UIMessage = { role: "agent", content: draft.text, toolCalls: [...draft.toolCalls] };
+				if (draft.msgIndex >= 0 && draft.msgIndex < msgs.length) {
+					msgs[draft.msgIndex] = entry;
+				} else {
+					draft.msgIndex = msgs.length;
+					msgs.push(entry);
+				}
+				uiMessages.value = msgs;
+				syncPending = false;
+			};
+
+			const syncDraft = (force = false) => {
+				if (force) {
+					if (syncTimer) clearTimeout(syncTimer);
+					syncTimer = null;
+					doSync();
+					return;
+				}
+				if (syncPending) return;
+				syncPending = true;
+				syncTimer = setTimeout(() => {
+					syncTimer = null;
+					doSync();
+				}, 50);
+			};
+
+			await runAgentLoop(messages, {
+				provider,
+				tools,
+				model: config.model,
+				systemPrompt: SYSTEM_PROMPT,
+				temperature: config.temperature,
+				contextLimit: { maxTokens: config.maxTokens, preserveRecentTurns: config.preserveRecentTurns },
+				maxTokens: config.maxCompletionTokens,
+				signal: ac.signal,
+			}, {
+				onTextDelta(delta: string) {
+					status.value = { kind: "writing" };
+					draft.text += delta;
+					syncDraft();
+				},
+				onToolCallEnd(id: string, name: string, args: string) {
+					status.value = { kind: "running_tool", toolName: name };
+					const idx = draft.toolCalls.length;
+					toolCallIndex.set(id, idx);
+					draft.toolCalls.push(createUIToolCall(name, args));
+					syncDraft(true);
+				},
+				onToolResult(id: string, result: ToolResult) {
+					const idx = toolCallIndex.get(id);
+					if (idx !== undefined && idx < draft.toolCalls.length) {
+						draft.toolCalls[idx] = {
+							...draft.toolCalls[idx],
+							output: result.content,
+							diff: result.meta?.diff,
+						};
 					}
-					session.value.setTokens(tokenCount.value);
-				}
-				if (generationId) {
-					const sid = sessionId.value;
-					provider.getGenerationStats(generationId).then((stats) => {
-						if (!stats || sessionId.value !== sid) return;
-						if (stats.totalCost !== null) {
-							totalCost.value += stats.totalCost;
+					syncDraft(true);
+				},
+				onMessageComplete(usage?: Usage, generationId?: string) {
+					if (usage) {
+						tokenCount.value = usage.prompt_tokens + usage.completion_tokens;
+						if (usage.cost) {
+							totalCost.value += usage.cost;
 							session.value.setCost(totalCost.value);
 						}
-						if (!usage && stats.promptTokens !== null && stats.completionTokens !== null) {
-							tokenCount.value = stats.promptTokens + stats.completionTokens;
-							session.value.setTokens(tokenCount.value);
-						}
-					});
-				}
-				status.value = { kind: "thinking" };
-			},
-			onTurnComplete: async (assistantMessage: Message, toolResults: Message[]) => {
-				const am = assistantMessage;
-				await session.value.append({
-					type: "message",
-					role: "assistant",
-					content: am.content,
-					...(am.tool_calls?.length && { toolCalls: am.tool_calls }),
-				});
+						session.value.setTokens(tokenCount.value);
+					}
+					if (generationId) {
+						const sid = sessionId.value;
+						provider.getGenerationStats(generationId).then((stats) => {
+							if (!stats || sessionId.value !== sid) return;
+							if (stats.totalCost !== null) {
+								totalCost.value += stats.totalCost;
+								session.value.setCost(totalCost.value);
+							}
+							if (!usage && stats.promptTokens !== null && stats.completionTokens !== null) {
+								tokenCount.value = stats.promptTokens + stats.completionTokens;
+								session.value.setTokens(tokenCount.value);
+							}
+						});
+					}
+					status.value = { kind: "thinking" };
+				},
+				onTurnComplete: async (assistantMessage: Message, toolResults: Message[]) => {
+					if (syncTimer) clearTimeout(syncTimer);
+					syncTimer = null;
+					syncPending = false;
+					if (draft.text || draft.toolCalls.length > 0) doSync();
 
-				for (const tr of toolResults) {
+					const am = assistantMessage;
 					await session.value.append({
-						type: "tool_result",
-						toolCallId: tr.tool_call_id!,
-						toolName: tr.name!,
-						content: tr.content!,
+						type: "message",
+						role: "assistant",
+						content: am.content,
+						...(am.tool_calls?.length && { toolCalls: am.tool_calls }),
 					});
-				}
 
-				draft.text = "";
-				draft.toolCalls = [];
-				draft.msgIndex = -1;
-				toolCallIndex.clear();
-			},
-			onError(error: Error) {
-				if (ac.signal.aborted) return;
-				uiMessages.value = [
-					...uiMessages.value,
-					{ role: "agent", content: `**Error:** ${error.message}` },
-				];
-			},
-		});
+					for (const tr of toolResults) {
+						await session.value.append({
+							type: "tool_result",
+							toolCallId: tr.tool_call_id!,
+							toolName: tr.name!,
+							content: tr.content!,
+						});
+					}
 
-		if (syncTimer) {
-			clearTimeout(syncTimer);
-			doSync();
+					draft.text = "";
+					draft.toolCalls = [];
+					draft.msgIndex = -1;
+					toolCallIndex.clear();
+				},
+				onError(error: Error) {
+					if (ac.signal.aborted) return;
+					uiMessages.value = [
+						...uiMessages.value,
+						{ role: "agent", content: `**Error:** ${error.message}` },
+					];
+				},
+			});
+
+			if (syncTimer) clearTimeout(syncTimer);
+			syncTimer = null;
+			if (draft.text || draft.toolCalls.length > 0) doSync();
+		} catch (error) {
+			if (!ac.signal.aborted) {
+				const message = error instanceof Error ? error.message : String(error);
+				uiMessages.value = [...uiMessages.value, { role: "agent", content: `**Error:** ${message}` }];
+			}
+		} finally {
+			if (syncTimer) clearTimeout(syncTimer);
+			isLoading.value = false;
+			abortController.value = null;
 		}
-
-		isLoading.value = false;
-		abortController.value = null;
 	};
 
 	const fileMentionStart = useSignal<number | null>(null);
@@ -357,6 +369,7 @@ function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: S
 			}
 		},
 		onDismiss: () => {
+			projectFiles.cancelIndexing();
 			const start = fileMentionStart.value;
 			if (start !== null) {
 				input.value = input.value.slice(0, start) + input.value.slice(start + 1);

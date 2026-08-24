@@ -10,8 +10,9 @@ import { resolve, SEPARATOR } from "@std/path";
 
 const IGNORE_DIRS = new Set([".git", "node_modules", "dist", "out", "build", "coverage", ".next", "target", ".cache"]);
 const MAX_FILES = 10_000;
-const MENTION_RE = /@([\w./_-]+\/?)/g;
+const MENTION_RE = /(?:^|\s)@([\w./_-]+\/?)/g;
 const MAX_MENTION_OUTPUT = 10_000;
+const MAX_MENTION_DEPTH = 8;
 
 /**
  * Resolves `rel` against `root`, returning the absolute path — or null when
@@ -107,12 +108,12 @@ export async function listProjectFiles(root: string): Promise<string[]> {
 	return await listFilesWalk(root);
 }
 
-async function readDirRecursive(absDir: string, relDir: string): Promise<string> {
+async function readDirRecursive(absDir: string, relDir: string, root: string): Promise<string> {
 	const parts: string[] = [];
 	let totalLen = 0;
 	let truncated = false;
 
-	async function walk(abs: string, rel: string) {
+	async function walk(abs: string, rel: string, depth: number) {
 		if (truncated) return;
 		let entries: Deno.DirEntry[];
 		try {
@@ -123,12 +124,16 @@ async function readDirRecursive(absDir: string, relDir: string): Promise<string>
 		entries.sort((a, b) => a.name.localeCompare(b.name));
 		for (const entry of entries) {
 			if (truncated) return;
+			if (entry.isSymlink) continue;
 			const absPath = `${abs}/${entry.name}`;
 			const relPath = `${rel}/${entry.name}`;
 			if (entry.isDirectory) {
 				if (IGNORE_DIRS.has(entry.name)) continue;
-				await walk(absPath, relPath);
+				if (depth >= MAX_MENTION_DEPTH) continue;
+				if (!await realPathWithinRoot(root, absPath)) continue;
+				await walk(absPath, relPath, depth + 1);
 			} else if (entry.isFile) {
+				if (!await realPathWithinRoot(root, absPath)) continue;
 				try {
 					const content = await Deno.readTextFile(absPath);
 					const header = `--- ${relPath} ---\n`;
@@ -148,10 +153,19 @@ async function readDirRecursive(absDir: string, relDir: string): Promise<string>
 		}
 	}
 
-	await walk(absDir.replace(/\/+$/, ""), relDir.replace(/\/+$/, ""));
+	await walk(absDir.replace(/\/+$/, ""), relDir.replace(/\/+$/, ""), 0);
 	let result = parts.join("");
 	if (truncated) result += "\n...(truncated)";
 	return result || "(empty directory)";
+}
+
+async function realPathWithinRoot(root: string, absPath: string): Promise<string | null> {
+	try {
+		const [realRoot, realPath] = await Promise.all([Deno.realPath(root), Deno.realPath(absPath)]);
+		return realPath === realRoot || realPath.startsWith(realRoot + SEPARATOR) ? realPath : null;
+	} catch {
+		return null;
+	}
 }
 
 /**
@@ -160,34 +174,42 @@ async function readDirRecursive(absDir: string, relDir: string): Promise<string>
  * that escape the root or don't exist are left as-is.
  */
 export async function expandMentions(text: string, root: string): Promise<string> {
-	const contextBlocks: string[] = [];
 	const seen = new Set<string>();
+	const mentions: string[] = [];
 
 	for (const match of text.matchAll(MENTION_RE)) {
-		const relPath = match[1];
+		const relPath = match[1].replace(/\/+$/, "");
+		if (!relPath) continue;
 		if (seen.has(relPath)) continue;
 		seen.add(relPath);
+		mentions.push(relPath);
+	}
 
+	const contextBlocks = await Promise.all(mentions.map(async (relPath) => {
 		const absPath = resolveWithinRoot(root, relPath);
-		if (!absPath) continue;
+		if (!absPath) return null;
 
 		try {
-			const stat = await Deno.stat(absPath);
+			const realPath = await realPathWithinRoot(root, absPath);
+			if (!realPath) return null;
+			const stat = await Deno.stat(realPath);
 			if (stat.isDirectory) {
-				contextBlocks.push(await readDirRecursive(absPath, relPath));
+				return await readDirRecursive(realPath, relPath, root);
 			} else if (stat.isFile) {
-				const raw = await Deno.readTextFile(absPath);
+				const raw = await Deno.readTextFile(realPath);
 				const content = raw.length > MAX_MENTION_OUTPUT
 					? raw.slice(0, MAX_MENTION_OUTPUT) + "\n...(truncated)"
 					: raw;
-				contextBlocks.push(`--- ${relPath} ---\n${content}`);
+				return `--- ${relPath} ---\n${content}`;
 			}
 		} catch {
 			// path doesn't exist or can't be read — leave mention as-is
 		}
-	}
+		return null;
+	}));
+	const blocks = contextBlocks.filter((block): block is string => block !== null);
 
-	if (contextBlocks.length === 0) return text;
+	if (blocks.length === 0) return text;
 
-	return `${text}\n\n<attached_context>\n${contextBlocks.join("\n\n")}\n</attached_context>`;
+	return `${text}\n\n<attached_context>\n${blocks.join("\n\n")}\n</attached_context>`;
 }

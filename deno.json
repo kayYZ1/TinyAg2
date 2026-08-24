@@ -5,7 +5,7 @@
 		"fmt": "deno fmt",
 		"fmt:check": "deno fmt --check",
 		"lint": "deno lint",
-		"test": "deno test --allow-read --allow-write --allow-env --allow-run",
+		"test": "deno test --unstable-raw-imports --allow-read --allow-write --allow-env --allow-run",
 		"agent": "deno run --unstable-raw-imports --allow-all packages/cli/agent/index.ts",
 		"playground:command-palette": "deno run --allow-all packages/cli/tui/playground/command-palette.tsx",
 		"playground:layout": "deno run --allow-all packages/cli/tui/playground/layout.tsx",
