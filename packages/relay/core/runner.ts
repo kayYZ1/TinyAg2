@@ -9,6 +9,10 @@ import type { ToolResult } from "@/core/tools/types.ts";
 export interface RunnerCallbacks {
 	/** Called for each text delta from the LLM stream. */
 	onTextDelta(delta: string): void | Promise<void>;
+	/** Called when the LLM starts a new tool call (before args stream in). */
+	onToolCallStart?(id: string, name: string): void | Promise<void>;
+	/** Called for each tool call arguments delta (raw JSON fragment). */
+	onToolCallArgsDelta?(id: string, args: string): void | Promise<void>;
 	/** Called when a tool call is fully received (args already accumulated). */
 	onToolCallEnd(id: string, name: string, args: string): void | Promise<void>;
 	/** Called when a tool execution completes. */
@@ -42,44 +46,63 @@ export async function runAgentLoop(
 	const toolCallArgs = new Map<string, string>();
 	const toolCallNames = new Map<string, string>();
 
+	const reportError = async (error: unknown) => {
+		try {
+			await callbacks.onError(error instanceof Error ? error : new Error(String(error)));
+		} catch {
+			// There is no callback available to report an onError failure to.
+		}
+	};
+	const invoke = async (callback: () => void | Promise<void>) => {
+		try {
+			await callback();
+		} catch (error) {
+			await reportError(error);
+		}
+	};
+
 	for await (const event of events) {
 		switch (event.type) {
 			case "text_delta":
-				await callbacks.onTextDelta(event.content);
+				await invoke(() => callbacks.onTextDelta(event.content));
 				break;
 
 			case "tool_call_start":
 				toolCallNames.set(event.id, event.name);
 				toolCallArgs.set(event.id, "");
+				await invoke(() => callbacks.onToolCallStart?.(event.id, event.name));
 				break;
 
 			case "tool_call_args_delta": {
 				const current = toolCallArgs.get(event.id) ?? "";
 				toolCallArgs.set(event.id, current + event.args);
+				await invoke(() => callbacks.onToolCallArgsDelta?.(event.id, event.args));
 				break;
 			}
 
 			case "tool_call_end": {
 				const name = toolCallNames.get(event.id) ?? "unknown";
 				const args = toolCallArgs.get(event.id) ?? "";
-				await callbacks.onToolCallEnd(event.id, name, args);
+				toolCallNames.delete(event.id);
+				toolCallArgs.delete(event.id);
+				await invoke(() => callbacks.onToolCallEnd(event.id, name, args));
 				break;
 			}
 
 			case "tool_result":
-				await callbacks.onToolResult(event.id, event.result);
+				await invoke(() => callbacks.onToolResult(event.id, event.result));
 				break;
 
 			case "message_complete":
-				await callbacks.onMessageComplete(event.usage, event.generationId);
+				await invoke(() => callbacks.onMessageComplete(event.usage, event.generationId));
 				break;
 
 			case "turn_complete":
-				await callbacks.onTurnComplete(event.assistantMessage, event.toolResults);
+				await invoke(() => callbacks.onTurnComplete(event.assistantMessage, event.toolResults));
 				break;
 
 			case "error":
-				await callbacks.onError(event.error);
+				await reportError(event.error);
 				break;
 		}
 
