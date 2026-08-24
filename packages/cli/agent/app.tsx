@@ -204,6 +204,33 @@ function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: S
 				}
 			}
 
+			const approvalHandler: ApprovalHandler = async (tool, toolInput) => {
+				const name = tool.definition.function.name;
+				if (alwaysApprovedTools.has(name)) return true;
+				if (ac.signal.aborted) return false;
+
+				const decision = await Promise.race([
+					approval.ask({
+						toolName: getToolDisplayName(name),
+						summary: summarizeToolArgs(name, JSON.stringify(toolInput)),
+					}),
+					// Deny the prompt if the run is aborted while waiting for an answer
+					new Promise<ApprovalDecision>((resolve) => {
+						ac.signal.addEventListener("abort", () => {
+							approval.cancel();
+							resolve("deny");
+						}, { once: true });
+					}),
+				]);
+
+				if (decision === "always") {
+					alwaysApprovedTools.add(name);
+					return true;
+				}
+				return decision === "allow";
+			};
+			const tools = createToolRegistry(withApproval(workspaceTools, approvalHandler));
+
 			const draft = { text: "", toolCalls: [] as UIToolCall[], msgIndex: -1 };
 			const toolCallIndex = new Map<string, number>();
 
