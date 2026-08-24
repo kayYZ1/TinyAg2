@@ -216,6 +216,7 @@ export class DatabaseSessionStore implements SessionStore {
 	}
 
 	private async execute(statement: Statement): Promise<Result> {
+		await this.schemaReady;
 		return await this.client.execute(statement) as unknown as Result;
 	}
 }
@@ -232,6 +233,7 @@ type DatabaseSessionHeader = {
 
 class DatabaseSessionHandle implements SessionHandle {
 	private headerDirty = false;
+	private appendQueue = Promise.resolve();
 
 	constructor(
 		private readonly store: DatabaseSessionStore,
@@ -242,11 +244,17 @@ class DatabaseSessionHandle implements SessionHandle {
 	) {}
 
 	async append(entry: NewEntry): Promise<string> {
-		const result = await this.store.append(this.scope, this.header, this.entries, entry, !this.persisted);
-		this.entries.push({ ...entry, id: result.id, timestamp: result.timestamp } as Entry);
-		this.persisted = true;
-		this.headerDirty = false;
-		return result.id;
+		let id = "";
+		const operation = this.appendQueue.then(async () => {
+			const result = await this.store.append(this.scope, this.header, this.entries, entry, !this.persisted);
+			id = result.id;
+			this.entries.push({ ...entry, id: result.id, timestamp: result.timestamp } as Entry);
+			this.persisted = true;
+			this.headerDirty = false;
+		});
+		this.appendQueue = operation.catch(() => {});
+		await operation;
+		return id;
 	}
 
 	getEntries(): Entry[] {
@@ -276,6 +284,7 @@ class DatabaseSessionHandle implements SessionHandle {
 	}
 
 	async flush(): Promise<void> {
+		await this.appendQueue;
 		if (!this.persisted || !this.headerDirty) return;
 		await this.store.updateHeader(this.scope, this.header);
 		this.headerDirty = false;

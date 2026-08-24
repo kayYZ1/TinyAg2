@@ -110,7 +110,7 @@ function entriesToUIMessages(entries: Entry[]): UIMessage[] {
 
 	for (const entry of entries) {
 		if (entry.type === "message" && entry.role === "user" && typeof entry.content === "string") {
-			const displayContent = entry.content.replace(/\n\n<attached_context>[\s\S]*<\/attached_context>$/, "");
+			const displayContent = stripAttachedContext(entry.content);
 			messages.push({ role: "user", content: displayContent });
 		} else if (entry.type === "message" && entry.role === "assistant") {
 			const hasContent = typeof entry.content === "string" && entry.content.trim();
@@ -148,6 +148,7 @@ function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: S
 	const sessionId = useSignal(0);
 	const uiMessages = useSignal<UIMessage[]>([]);
 	const session = useSignal<SessionHandle>(initialSession);
+	const generationCosts = useSignal(new Map<string, number>());
 	const abortController = useSignal<AbortController | null>(null);
 	const escPrimed = useSignal(false);
 
@@ -307,27 +308,30 @@ function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: S
 					syncDraft(true);
 				},
 				onMessageComplete(usage?: Usage, generationId?: string) {
+					const fallbackCost = usage?.cost ?? 0;
 					if (usage) {
 						tokenCount.value = usage.prompt_tokens + usage.completion_tokens;
-						if (usage.cost) {
-							totalCost.value += usage.cost;
+						if (fallbackCost) {
+							totalCost.value += fallbackCost;
 							session.value.setCost(totalCost.value);
 						}
 						session.value.setTokens(tokenCount.value);
 					}
 					if (generationId) {
+						generationCosts.value.set(generationId, fallbackCost);
 						const sid = sessionId.value;
 						provider.getGenerationStats(generationId).then((stats) => {
 							if (!stats || sessionId.value !== sid) return;
 							if (stats.totalCost !== null) {
-								totalCost.value += stats.totalCost;
+								totalCost.value += stats.totalCost - (generationCosts.value.get(generationId) ?? 0);
+								generationCosts.value.delete(generationId);
 								session.value.setCost(totalCost.value);
 							}
 							if (!usage && stats.promptTokens !== null && stats.completionTokens !== null) {
 								tokenCount.value = stats.promptTokens + stats.completionTokens;
 								session.value.setTokens(tokenCount.value);
 							}
-						});
+						}).catch(() => {});
 					}
 					status.value = { kind: "thinking" };
 				},
@@ -394,15 +398,17 @@ function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: S
 		maxResults: 20,
 		onSelect: (item) => {
 			if (isLoading.value) return;
-			session.value.flush();
-			currentSession = null;
-			sessionStore.open(item.id, sessionScope.ownerId).then((sm) => {
+			void (async () => {
+				await session.value.flush();
+				const sm = await sessionStore.open(item.id, sessionScope.ownerId);
 				session.value = sm;
 				currentSession = sm;
 				uiMessages.value = entriesToUIMessages(sm.getEntries());
 				tokenCount.value = sm.getTokens();
 				totalCost.value = sm.getCost();
 				sessionId.value++;
+			})().catch((error) => {
+				uiMessages.value = [...uiMessages.value, { role: "agent", content: `**Session error:** ${error}` }];
 			});
 		},
 	});
@@ -436,17 +442,20 @@ function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: S
 		mode,
 		onSelect: (item) => {
 			if (item.id === "new-chat") {
-				session.value.flush();
-				currentSession = null;
-				uiMessages.value = [];
-				tokenCount.value = 0;
-				totalCost.value = 0;
-				sessionId.value++;
-				const newSm = sessionStore.create(sessionScope);
-				session.value = newSm;
-				currentSession = newSm;
+				void (async () => {
+					await session.value.flush();
+					uiMessages.value = [];
+					tokenCount.value = 0;
+					totalCost.value = 0;
+					sessionId.value++;
+					const newSm = sessionStore.create(sessionScope);
+					session.value = newSm;
+					currentSession = newSm;
+				})().catch((error) => {
+					uiMessages.value = [...uiMessages.value, { role: "agent", content: `**Session error:** ${error}` }];
+				});
 			} else if (item.id === "threads") {
-				sessionStore.listSummaries(sessionScope).then((summaries) => {
+				void sessionStore.listSummaries(sessionScope).then((summaries) => {
 					threadItems.value = summaries.map((s) => {
 						const date = new Date(s.timestamp);
 						const label = date.toLocaleString();
@@ -458,11 +467,13 @@ function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: S
 						return { id: s.reference, title: preview, description: label, keywords: [s.id] };
 					});
 					threadsPalette.openPalette();
+				}).catch((error) => {
+					uiMessages.value = [...uiMessages.value, { role: "agent", content: `**Session error:** ${error}` }];
 				});
 			} else if (item.id === "quit") {
-				session.value.flush();
-				currentSession = null;
-				onQuit();
+				void session.value.flush().then(onQuit).catch((error) => {
+					uiMessages.value = [...uiMessages.value, { role: "agent", content: `**Session error:** ${error}` }];
+				});
 			}
 		},
 	});

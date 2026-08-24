@@ -10,11 +10,11 @@ import type { SessionHandle, SessionScope, SessionStore, SessionSummary } from "
  */
 export class FileSessionStore implements SessionStore {
 	create(scope: SessionScope): SessionHandle {
-		return SessionManager.create(scope.cwd);
+		return SessionManager.create(scope.cwd, scope.ownerId);
 	}
 
 	async continueRecent(scope: SessionScope): Promise<SessionHandle | null> {
-		return await SessionManager.continueRecent(scope.cwd);
+		return await SessionManager.continueRecent(scope.cwd, scope.ownerId);
 	}
 
 	async open(reference: string, _ownerId: string): Promise<SessionHandle> {
@@ -22,6 +22,6 @@ export class FileSessionStore implements SessionStore {
 	}
 
 	async listSummaries(scope: SessionScope): Promise<SessionSummary[]> {
-		return await SessionManager.listSummaries(scope.cwd);
+		return await SessionManager.listSummaries(scope.cwd, scope.ownerId);
 	}
 }

@@ -38,10 +38,10 @@ together into an interactive coding assistant that runs entirely in your termina
 > that binary uses local JSONL files, not the shared database. Until a new release is published, build from source to
 > get the current behavior.
 
-Download the latest Linux binary from [GitHub Releases](https://github.com/kayYZ1/relay/releases/latest):
+Download the latest Linux binary from [GitHub Releases](https://github.com/vvtxn/relay/releases/latest):
 
 ```bash
-curl -L https://github.com/kayYZ1/relay/releases/latest/download/relay -o relay
+curl -L https://github.com/vvtxn/relay/releases/latest/download/relay -o relay
 chmod +x relay
 sudo mv relay /usr/local/bin/
 ```
@@ -49,7 +49,7 @@ sudo mv relay /usr/local/bin/
 Or build the current version from source (see [Development](#development)):
 
 ```bash
-git clone https://github.com/kayYZ1/relay.git
+git clone https://github.com/vvtxn/relay.git
 cd relay
 deno task build        # outputs dist/relay
 ```
@@ -67,7 +67,7 @@ Model and provider settings are configured in `~/.relay/config.json`.
 ### Setup
 
 ```bash
-git clone https://github.com/kayYZ1/relay.git
+git clone https://github.com/vvtxn/relay.git
 cd relay
 ```
 
