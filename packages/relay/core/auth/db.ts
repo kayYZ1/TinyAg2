@@ -3,16 +3,16 @@ import type { AuthenticatedUser, AuthIdentity, UserStore } from "./types.ts";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
-	 id TEXT PRIMARY KEY,
-	 created_at TEXT NOT NULL
+	id TEXT PRIMARY KEY,
+	created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS auth_identities (
-	 user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-	 provider TEXT NOT NULL,
-	 provider_subject TEXT NOT NULL,
-	 email TEXT,
-	 created_at TEXT NOT NULL,
-	 PRIMARY KEY (provider, provider_subject)
+	user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	provider TEXT NOT NULL,
+	provider_subject TEXT NOT NULL,
+	email TEXT,
+	created_at TEXT NOT NULL,
+	PRIMARY KEY (provider, provider_subject)
 );
 CREATE INDEX IF NOT EXISTS auth_identities_user_idx ON auth_identities (user_id);
 `;
@@ -20,6 +20,12 @@ CREATE INDEX IF NOT EXISTS auth_identities_user_idx ON auth_identities (user_id)
 type QueryArgs = (string | null)[];
 type Result = { rows: Record<string, unknown>[] };
 type DatabaseClient = Pick<ReturnType<typeof createClient>, "execute" | "batch">;
+
+function isConstraintViolation(error: unknown): boolean {
+	if (!(error instanceof Error)) return false;
+	const code = "code" in error && typeof error.code === "string" ? error.code : "";
+	return code.startsWith("SQLITE_CONSTRAINT") || /constraint failed/i.test(error.message);
+}
 
 export interface DatabaseUserStoreOptions {
 	url: string;
@@ -72,11 +78,12 @@ export class DatabaseUserStore implements UserStore {
 						(user_id, provider, provider_subject, email, created_at) VALUES (?, ?, ?, ?, ?)`,
 					args: [userId, identity.provider, identity.subject, identity.email ?? null, now],
 				},
-			] as { sql: string; args: QueryArgs }[];
+			];
 			await this.client.batch(statements, "write");
 			return { id: userId };
 		} catch (error) {
 			// Another client may have claimed the identity between our read and insert.
+			if (!isConstraintViolation(error)) throw error;
 			const raced = await this.execute({
 				sql: "SELECT user_id FROM auth_identities WHERE provider = ? AND provider_subject = ?",
 				args: [identity.provider, identity.subject],
