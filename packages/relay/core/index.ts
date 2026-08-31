@@ -37,6 +37,13 @@ export type {
 	ToolResultEntry,
 } from "./sessions/index.ts";
 
+export { DatabaseUserStore } from "./auth/db.ts";
+export { GitHubAuthProvider } from "./auth/github.ts";
+export { LocalAuthProvider } from "./auth/local.ts";
+export { authenticate } from "./auth/service.ts";
+export type { GitHubProfile } from "./auth/github.ts";
+export type { AuthenticatedUser, AuthIdentity, AuthProvider, UserStore } from "./auth/types.ts";
+
 export { homeDir, relayDir } from "./paths.ts";
 
 export { SYSTEM_PROMPT } from "./system-prompt.ts";

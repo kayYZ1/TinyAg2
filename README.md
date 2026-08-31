@@ -77,7 +77,7 @@ Set your API key:
 export LLM_API_KEY="your-api-key"
 export TURSO_DB_URL="your-database-url"
 export TURSO_DB_TOKEN="your-database-token"
-export RELAY_OWNER_ID="your-user-id"
+export DEV_AUTH_SUBJECT="your-local-user"
 ```
 
 ### Run
@@ -137,8 +137,11 @@ The agent loop is an async generator (`run()`) that streams `AgentEvent`s:
 | `edit_file`     | Edit         | Edit files with diff output      |
 | `grep`          | Grep         | Search files with regex patterns |
 
+**Authentication** — Provider identities are resolved to internal user IDs before they reach application storage. Local
+development uses `DEV_AUTH_SUBJECT`; GitHub identity mapping is ready for a future OAuth flow.
+
 **Session persistence** — Conversations are stored in the shared Turso database and can be shared by the terminal and
-web clients. The terminal requires `TURSO_DB_URL`, `TURSO_DB_TOKEN`, and a shared `RELAY_OWNER_ID`:
+web clients. The terminal requires `TURSO_DB_URL`, `TURSO_DB_TOKEN`, and `DEV_AUTH_SUBJECT` while local auth is active:
 
 - **Create** — New sessions with unique IDs and timestamps
 - **Continue** — Resume the most recent session for a workspace
@@ -232,7 +235,7 @@ Tag-based releases via GitHub Actions (`.github/workflows/release.yml`):
 3. `git tag v<version> && git push --tags`
 4. CI builds the Linux binary without embedding environment files and creates the GitHub Release
 
-The released binary reads `LLM_API_KEY`, `TURSO_DB_URL`, `TURSO_DB_TOKEN`, and `RELAY_OWNER_ID` from its runtime
+The released binary reads `LLM_API_KEY`, `TURSO_DB_URL`, `TURSO_DB_TOKEN`, and `DEV_AUTH_SUBJECT` from its runtime
 environment. Local `deno task build` builds may load `.env` automatically, but release builds should not include secrets
 in the executable.
 
