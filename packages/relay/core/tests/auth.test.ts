@@ -32,7 +32,14 @@ Deno.test("authenticate resolves an identity through the user store", async () =
 		},
 	});
 	assertEquals(received, { provider: "local", subject: "dev-user" });
-	assertEquals(user, { id: "internal-user-id" });
+	assertEquals(user, { id: "internal-user-id", name: "dev-user", provider: "local" });
+});
+
+Deno.test("authenticate prefers the identity email as the display name", async () => {
+	const user = await authenticate(new GitHubAuthProvider(), { id: 12345, email: "dev@example.com" }, {
+		resolve: () => Promise.resolve({ id: "internal-user-id" }),
+	});
+	assertEquals(user.name, "dev@example.com");
 });
 
 Deno.test("LocalAuthProvider rejects an empty subject", () => {

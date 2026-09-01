@@ -8,6 +8,10 @@ export interface AuthIdentity {
 /** The application identity used by domain and storage code. */
 export interface AuthenticatedUser {
 	id: string;
+	/** Human-readable name derived from the provider identity (email or subject). */
+	name?: string;
+	/** The provider that supplied the identity. */
+	provider?: string;
 }
 
 /** Client/provider-specific authentication is intentionally outside this contract. */

@@ -7,5 +7,10 @@ export async function authenticate<Input>(
 	users: UserStore,
 ): Promise<AuthenticatedUser> {
 	const identity = await provider.authenticate(input);
-	return await users.resolve(identity);
+	const user = await users.resolve(identity);
+	return {
+		...user,
+		name: user.name ?? identity.email ?? identity.subject,
+		provider: identity.provider,
+	};
 }

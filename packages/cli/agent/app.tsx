@@ -499,12 +499,18 @@ function App({ onQuit, initialSession }: { onQuit: () => void; initialSession: S
 
 	return (
 		<Box flex flexDirection="column" padding={1}>
-			<StatusBar tokenCount={tokenCount.value} totalCost={totalCost.value} branchName={branchName} />
+			<StatusBar
+				tokenCount={tokenCount.value}
+				totalCost={totalCost.value}
+				branchName={branchName}
+				userName={user.name}
+			/>
 
 			{uiMessages.value.length === 0
 				? (
 					<WelcomeScreen
 						version={VERSION}
+						user={user.name}
 						hints="Enter to send • @ for files • / for commands • PageUp/PageDown to scroll • i/Esc to toggle mode"
 					/>
 				)

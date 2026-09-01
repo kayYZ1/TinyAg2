@@ -25,10 +25,11 @@ export interface WelcomeScreenProps {
 	version: string;
 	subtitle?: string;
 	hints?: string;
+	user?: string;
 }
 
 export function WelcomeScreen(
-	{ version, subtitle = "Type a message to get started", hints }: WelcomeScreenProps,
+	{ version, subtitle = "Type a message to get started", hints, user }: WelcomeScreenProps,
 ) {
 	return (
 		<Box flex flexDirection="column" justifyContent="center" alignItems="center" gap={1}>
@@ -38,6 +39,7 @@ export function WelcomeScreen(
 			<Box flexDirection="column" alignItems="center" gap={1}>
 				<Text color={theme.textMuted}>v{version}</Text>
 				<Text color={theme.textDim}>{config.model.split("/").pop()}</Text>
+				{user && <Text color={theme.textDim}>signed in as {user}</Text>}
 				<Text color={theme.textDim} italic>{subtitle}</Text>
 				{hints && <Text color={theme.textDim} italic>{hints}</Text>}
 			</Box>
