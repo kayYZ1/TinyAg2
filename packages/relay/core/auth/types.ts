@@ -8,7 +8,7 @@ export interface AuthIdentity {
 /** The application identity used by domain and storage code. */
 export interface AuthenticatedUser {
 	id: string;
-	/** Human-readable name derived from the provider identity (email or subject). */
+	/** Human-readable name: stored name, then identity email, then provider subject. */
 	name?: string;
 	/** The provider that supplied the identity. */
 	provider?: string;
